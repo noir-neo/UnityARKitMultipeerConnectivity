@@ -38,6 +38,8 @@ GameObject:
   m_Component:
   - component: {fileID: 4132569927923988}
   - component: {fileID: 114532722665646252}
+  - component: {fileID: 114428145807374968}
+  - component: {fileID: 114196976508760780}
   m_Layer: 0
   m_Name: Axes
   m_TagString: Untagged
@@ -298,6 +300,59 @@ BoxCollider:
   serializedVersion: 2
   m_Size: {x: 1, y: 1, z: 1}
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &114196976508760780
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_PrefabParentObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 100100000}
+  m_GameObject: {fileID: 1376442012394146}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1768714887, guid: 870353891bb340e2b2a9c8707e7419ba, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_TransformSyncMode: 1
+  m_SendInterval: 0.1
+  m_SyncRotationAxis: 7
+  m_RotationSyncCompression: 0
+  m_SyncSpin: 0
+  m_MovementTheshold: 0.001
+  m_VelocityThreshold: 0.0001
+  m_SnapThreshold: 5
+  m_InterpolateRotation: 1
+  m_InterpolateMovement: 1
+--- !u!114 &114428145807374968
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_PrefabParentObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 100100000}
+  m_GameObject: {fileID: 1376442012394146}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 372142912, guid: 870353891bb340e2b2a9c8707e7419ba, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_SceneId:
+    m_Value: 0
+  m_AssetId:
+    i0: 22
+    i1: 169
+    i2: 17
+    i3: 191
+    i4: 244
+    i5: 30
+    i6: 68
+    i7: 239
+    i8: 168
+    i9: 71
+    i10: 13
+    i11: 112
+    i12: 46
+    i13: 86
+    i14: 101
+    i15: 85
+  m_ServerOnly: 0
+  m_LocalPlayerAuthority: 0
 --- !u!114 &114532722665646252
 MonoBehaviour:
   m_ObjectHideFlags: 1
