@@ -27,6 +27,8 @@ namespace UnitySwift {
                 proj.SetBuildProperty(targetGuid, "SWIFT_OBJC_INTERFACE_HEADER_NAME", "unityswift-Swift.h");
                 proj.AddBuildProperty(targetGuid, "LD_RUNPATH_SEARCH_PATHS", "@executable_path/Frameworks");
 
+                proj.SetBuildProperty(targetGuid, "SWIFT_VERSION", "4.2");
+
                 proj.WriteToFile(projPath);
             }
         }
