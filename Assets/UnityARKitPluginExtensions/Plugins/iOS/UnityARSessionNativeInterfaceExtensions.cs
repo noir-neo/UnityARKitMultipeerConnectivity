@@ -1,15 +1,20 @@
-﻿using System.Threading.Tasks;
+﻿using UniRx.Async;
 using UnityEngine.XR.iOS;
 
 namespace UnityARKitPluginExtensions
 {
     public static class UnityARSessionNativeInterfaceExtensions
     {
-        public static Task<ARWorldMap> GetCurrentWorldMapAsnyc(this UnityARSessionNativeInterface arSessionNativeInterface)
+        public static IPromise<ARWorldMap> GetCurrentWorldMapPromise(this UnityARSessionNativeInterface arSessionNativeInterface)
         {
-            var t = new TaskCompletionSource<ARWorldMap>();
-            arSessionNativeInterface.GetCurrentWorldMapAsync(x => t.TrySetResult(x));
-            return t.Task;
+            return new Promise<ARWorldMap>((resolve, _) =>
+                arSessionNativeInterface.GetCurrentWorldMapAsync(resolve.SetResult));
+        }
+
+        public static UniTask<ARWorldMap> GetCurrentWorldMapAsnyc(this UnityARSessionNativeInterface arSessionNativeInterface)
+        {
+            var promise = arSessionNativeInterface.GetCurrentWorldMapPromise();
+            return new UniTask<ARWorldMap>(promise);
         }
     }
 }
