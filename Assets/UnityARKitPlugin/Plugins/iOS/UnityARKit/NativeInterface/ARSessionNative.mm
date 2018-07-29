@@ -200,13 +200,6 @@ inline void UnityARMatrix4x4FromCGAffineTransform(UnityARMatrix4x4& outMatrix, C
     }
 }
 
-inline void UnityARUserAnchorDataFromARAnchorPtr(UnityARUserAnchorData& anchorData, ARAnchor* nativeAnchor)
-{
-    anchorData.identifier = (void*)[nativeAnchor.identifier.UUIDString UTF8String];
-    ARKitMatrixToUnityARMatrix4x4(nativeAnchor.transform, &anchorData.transform);
-}
-
-
 #if ARKIT_USES_FACETRACKING
 inline void UnityARFaceGeometryFromARFaceGeometry(UnityARFaceGeometry& faceGeometry, ARFaceGeometry *arFaceGeometry)
 {

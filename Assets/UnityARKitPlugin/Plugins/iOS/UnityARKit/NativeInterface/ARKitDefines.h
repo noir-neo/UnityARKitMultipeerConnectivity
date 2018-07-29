@@ -405,3 +405,9 @@ static inline ARPlaneDetection GetARPlaneDetectionFromUnityARPlaneDetection(Unit
         ret |= ARPlaneDetectionVertical;
     return ret;
 }
+
+static inline void UnityARUserAnchorDataFromARAnchorPtr(UnityARUserAnchorData& anchorData, ARAnchor* nativeAnchor)
+{
+    anchorData.identifier = (void*)[nativeAnchor.identifier.UUIDString UTF8String];
+    ARKitMatrixToUnityARMatrix4x4(nativeAnchor.transform, &anchorData.transform);
+}

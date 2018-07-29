@@ -19,6 +19,7 @@ class UnityMCSession: NSObject {
     private var serviceBrowser: MCNearbyServiceBrowser!
     
     private var worldMapReceived: UNITY_MC_WORLD_MAP_CALLBACK!
+    private var anchorReceived: UNITY_MC_ANCHOR_CALLBACK!
 
     override init() {
         super.init()
@@ -50,8 +51,9 @@ class UnityMCSession: NSObject {
         }
     }
     
-    func setCallbacks(_ worldMapReceived: @escaping UNITY_MC_WORLD_MAP_CALLBACK) {
+    func setCallbacks(_ worldMapReceived: @escaping UNITY_MC_WORLD_MAP_CALLBACK, anchorReceived: @escaping UNITY_MC_ANCHOR_CALLBACK) {
         self.worldMapReceived = worldMapReceived
+        self.anchorReceived = anchorReceived
     }
 
     func receivedDataHandler(_ data: Data, from peer: MCPeerID) {
@@ -63,9 +65,12 @@ class UnityMCSession: NSObject {
             worldMapReceived(ptr)
             unmanaged.release()
         }
-        else
-            if let unarchived = try? NSKeyedUnarchiver.unarchivedObject(of: ARAnchor.classForKeyedUnarchiver(), from: data),
-                let anchor = unarchived as? ARAnchor {
+        else if let unarchived = try? NSKeyedUnarchiver.unarchivedObject(of: ARAnchor.classForKeyedUnarchiver(), from: data),
+            let anchor = unarchived as? ARAnchor {
+            let unmanaged = Unmanaged.passRetained(anchor)
+            let ptr = unmanaged.toOpaque()
+            anchorReceived(ptr)
+            unmanaged.release()
         }
         else {
             print("unknown data recieved from \(peer)")
