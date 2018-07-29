@@ -889,7 +889,9 @@ extern "C" UnityARUserAnchorData SessionAddUserAnchor(void* nativeSession, Unity
     // then return the data back to the user that they will
     // need in case they want to remove it
     UnityARSession* session = (__bridge UnityARSession*)nativeSession;
-    ARAnchor *newAnchor = [[ARAnchor alloc] initWithTransform:matrix_identity_float4x4];
+    matrix_float4x4 matrix;
+    UnityARMatrix4x4ToARKitMatrix(anchorData.transform, &matrix);
+    ARAnchor *newAnchor = [[ARAnchor alloc] initWithTransform:matrix];
     
     [session->_session addAnchor:newAnchor];
     UnityARUserAnchorData returnAnchorData;
