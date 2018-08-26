@@ -10,6 +10,8 @@ namespace UniRx.Async
 {
     public partial struct UniTask
     {
+        // UniTask
+
         public static async UniTask<(bool hasResultLeft, T0 result)> WhenAny<T0>(UniTask<T0> task0, UniTask task1)
         {
             return await new UnitWhenAnyPromise<T0>(task0, task1);
@@ -20,6 +22,7 @@ namespace UniRx.Async
             return await new WhenAnyPromise<T>(tasks);
         }
 
+        /// <summary>Return value is winArgumentIndex</summary>
         public static async UniTask<int> WhenAny(params UniTask[] tasks)
         {
             return await new WhenAnyPromise(tasks);
@@ -365,7 +368,6 @@ namespace UniRx.Async
                 }
             }
         }
-
     }
 }
 

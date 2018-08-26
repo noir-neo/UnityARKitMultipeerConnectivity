@@ -11,7 +11,7 @@ namespace UniRx.Async.CompilerServices
 {
     public struct AsyncUniTaskMethodBuilder
     {
-        Promise<AsyncUnit> promise;
+        UniTaskCompletionSource promise;
         Action moveNext;
 
         // 1. Static Create method.
@@ -30,7 +30,7 @@ namespace UniRx.Async.CompilerServices
             {
                 if (promise != null)
                 {
-                    return new UniTask(promise);
+                    return promise.Task;
                 }
 
                 if (moveNext == null)
@@ -39,8 +39,8 @@ namespace UniRx.Async.CompilerServices
                 }
                 else
                 {
-                    promise = new Promise<AsyncUnit>();
-                    return new UniTask(promise);
+                    promise = new UniTaskCompletionSource();
+                    return promise.Task;
                 }
             }
         }
@@ -51,9 +51,16 @@ namespace UniRx.Async.CompilerServices
         {
             if (promise == null)
             {
-                promise = new Promise<AsyncUnit>();
+                promise = new UniTaskCompletionSource();
             }
-            promise.SetException(exception);
+            if (exception is OperationCanceledException ex)
+            {
+                promise.TrySetCanceled(ex);
+            }
+            else
+            {
+                promise.TrySetException(exception);
+            }
         }
 
         // 4. SetResult
@@ -67,9 +74,9 @@ namespace UniRx.Async.CompilerServices
             {
                 if (promise == null)
                 {
-                    promise = new Promise<AsyncUnit>();
+                    promise = new UniTaskCompletionSource();
                 }
-                promise.SetResult(default(AsyncUnit));
+                promise.TrySetResult();
             }
         }
 
@@ -83,14 +90,12 @@ namespace UniRx.Async.CompilerServices
             {
                 if (promise == null)
                 {
-                    promise = new Promise<AsyncUnit>(); // built future.
+                    promise = new UniTaskCompletionSource(); // built future.
                 }
 
-                var runner = new MoveNextRunner();
+                var runner = new MoveNextRunner<TStateMachine>();
                 moveNext = runner.Run;
-
-                var boxed = (IAsyncStateMachine)stateMachine;
-                runner.StateMachine = boxed; // boxed
+                runner.StateMachine = stateMachine; // set after create delegate.
             }
 
             awaiter.OnCompleted(moveNext);
@@ -107,14 +112,12 @@ namespace UniRx.Async.CompilerServices
             {
                 if (promise == null)
                 {
-                    promise = new Promise<AsyncUnit>(); // built future.
+                    promise = new UniTaskCompletionSource(); // built future.
                 }
 
-                var runner = new MoveNextRunner();
+                var runner = new MoveNextRunner<TStateMachine>();
                 moveNext = runner.Run;
-
-                var boxed = (IAsyncStateMachine)stateMachine;
-                runner.StateMachine = boxed; // boxed
+                runner.StateMachine = stateMachine; // set after create delegate.
             }
 
             awaiter.UnsafeOnCompleted(moveNext);
@@ -133,23 +136,13 @@ namespace UniRx.Async.CompilerServices
         public void SetStateMachine(IAsyncStateMachine stateMachine)
         {
         }
-
-        class MoveNextRunner
-        {
-            public IAsyncStateMachine StateMachine;
-
-            public void Run()
-            {
-                StateMachine.MoveNext();
-            }
-        }
     }
 
 
     public struct AsyncUniTaskMethodBuilder<T>
     {
         T result;
-        Promise<T> promise;
+        UniTaskCompletionSource<T> promise;
         Action moveNext;
 
         // 1. Static Create method.
@@ -177,7 +170,7 @@ namespace UniRx.Async.CompilerServices
                 }
                 else
                 {
-                    promise = new Promise<T>();
+                    promise = new UniTaskCompletionSource<T>();
                     return new UniTask<T>(promise);
                 }
             }
@@ -189,9 +182,16 @@ namespace UniRx.Async.CompilerServices
         {
             if (promise == null)
             {
-                promise = new Promise<T>();
+                promise = new UniTaskCompletionSource<T>();
             }
-            promise.SetException(exception);
+            if (exception is OperationCanceledException ex)
+            {
+                promise.TrySetCanceled(ex);
+            }
+            else
+            {
+                promise.TrySetException(exception);
+            }
         }
 
         // 4. SetResult
@@ -206,9 +206,9 @@ namespace UniRx.Async.CompilerServices
             {
                 if (promise == null)
                 {
-                    promise = new Promise<T>();
+                    promise = new UniTaskCompletionSource<T>();
                 }
-                promise.SetResult(result);
+                promise.TrySetResult(result);
             }
         }
 
@@ -222,14 +222,12 @@ namespace UniRx.Async.CompilerServices
             {
                 if (promise == null)
                 {
-                    promise = new Promise<T>(); // built future.
+                    promise = new UniTaskCompletionSource<T>(); // built future.
                 }
 
-                var runner = new MoveNextRunner();
+                var runner = new MoveNextRunner<TStateMachine>();
                 moveNext = runner.Run;
-
-                var boxed = (IAsyncStateMachine)stateMachine;
-                runner.StateMachine = boxed; // boxed
+                runner.StateMachine = stateMachine; // set after create delegate.
             }
 
             awaiter.OnCompleted(moveNext);
@@ -246,14 +244,12 @@ namespace UniRx.Async.CompilerServices
             {
                 if (promise == null)
                 {
-                    promise = new Promise<T>(); // built future.
+                    promise = new UniTaskCompletionSource<T>(); // built future.
                 }
 
-                var runner = new MoveNextRunner();
+                var runner = new MoveNextRunner<TStateMachine>();
                 moveNext = runner.Run;
-
-                var boxed = (IAsyncStateMachine)stateMachine;
-                runner.StateMachine = boxed; // boxed
+                runner.StateMachine = stateMachine; // set after create delegate.
             }
 
             awaiter.UnsafeOnCompleted(moveNext);
@@ -271,16 +267,6 @@ namespace UniRx.Async.CompilerServices
         [DebuggerHidden]
         public void SetStateMachine(IAsyncStateMachine stateMachine)
         {
-        }
-
-        class MoveNextRunner
-        {
-            public IAsyncStateMachine StateMachine;
-
-            public void Run()
-            {
-                StateMachine.MoveNext();
-            }
         }
     }
 }
