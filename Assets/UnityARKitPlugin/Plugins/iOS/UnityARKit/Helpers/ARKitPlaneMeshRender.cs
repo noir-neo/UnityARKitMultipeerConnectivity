@@ -23,6 +23,13 @@ public class ARKitPlaneMeshRender : MonoBehaviour {
 	{
         if (UnityARSessionNativeInterface.IsARKit_1_5_Supported()) //otherwise we cannot access planeGeometry
         {
+	        if (arPlaneAnchor.planeGeometry.vertices.Length != planeMesh.vertices.Length || 
+	            arPlaneAnchor.planeGeometry.textureCoordinates.Length != planeMesh.uv.Length ||
+	            arPlaneAnchor.planeGeometry.triangleIndices.Length != planeMesh.triangles.Length)
+	        {
+		        planeMesh.Clear();
+	        }
+	        
             planeMesh.vertices = arPlaneAnchor.planeGeometry.vertices;
             planeMesh.uv = arPlaneAnchor.planeGeometry.textureCoordinates;
             planeMesh.triangles = arPlaneAnchor.planeGeometry.triangleIndices;

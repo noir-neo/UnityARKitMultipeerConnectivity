@@ -773,6 +773,18 @@ extern "C" void session_SetImageAnchorCallbacks(const void* session, UNITY_AR_IM
     }
 }
 
+extern "C" void* session_GetARKitSessionPtr(const void* session)
+{
+    UnityARSession* nativeSession = (__bridge UnityARSession*)session;
+    return (__bridge void*)nativeSession->_session;
+}
+
+extern "C" void* session_GetARKitFramePtr(const void* session)
+{
+    UnityARSession* nativeSession = (__bridge UnityARSession*)session;
+    return (__bridge void*)nativeSession->_session.currentFrame;
+}
+
 extern "C" void StartWorldTrackingSessionWithOptions(void* nativeSession, ARKitWorldTrackingSessionConfiguration unityConfig, UnityARSessionRunOptions runOptions)
 {
     UnityARSession* session = (__bridge UnityARSession*)nativeSession;
@@ -889,9 +901,10 @@ extern "C" UnityARUserAnchorData SessionAddUserAnchor(void* nativeSession, Unity
     // then return the data back to the user that they will
     // need in case they want to remove it
     UnityARSession* session = (__bridge UnityARSession*)nativeSession;
-    matrix_float4x4 matrix;
-    UnityARMatrix4x4ToARKitMatrix(anchorData.transform, &matrix);
-    ARAnchor *newAnchor = [[ARAnchor alloc] initWithTransform:matrix];
+    
+    matrix_float4x4 anchor_transform = matrix_identity_float4x4;
+    UnityARMatrix4x4ToARKitMatrix(anchorData.transform, &anchor_transform);
+    ARAnchor *newAnchor = [[ARAnchor alloc] initWithTransform:anchor_transform];
     
     [session->_session addAnchor:newAnchor];
     UnityARUserAnchorData returnAnchorData;

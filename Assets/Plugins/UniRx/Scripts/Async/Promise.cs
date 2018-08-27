@@ -3,95 +3,130 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Threading;
+using UniRx.Async.Internal;
 
 namespace UniRx.Async
 {
-    public interface IPromise<T>
+    internal class ExceptionHolder
     {
-        bool IsCompleted { get; }
-        T GetResult();
-        void RegisterContinuation(Action action);
+        ExceptionDispatchInfo exception;
+        bool calledGet = false;
+
+        public ExceptionHolder(ExceptionDispatchInfo exception)
+        {
+            this.exception = exception;
+        }
+
+        public ExceptionDispatchInfo GetException()
+        {
+            if (!calledGet)
+            {
+                calledGet = true;
+                GC.SuppressFinalize(this);
+            }
+            return exception;
+        }
+
+        ~ExceptionHolder()
+        {
+            UniTaskScheduler.PublishUnobservedTaskException(exception.SourceException);
+        }
     }
 
-    public interface IResolve<T>
+    public interface IResolvePromise
     {
-        void SetResult(T value);
+        bool TrySetResult();
     }
 
-    public interface IReject
+    public interface IResolvePromise<T>
     {
-        void SetException(Exception ex);
+        bool TrySetResult(T value);
     }
 
-    public class Promise<T> : IPromise<T>, IResolve<T>, IReject
+    public interface IRejectPromise
     {
+        bool TrySetException(Exception exception);
+    }
+
+    public interface ICancelPromise
+    {
+        bool TrySetCanceled();
+    }
+
+    public interface IPromise<T> : IResolvePromise<T>, IRejectPromise, ICancelPromise
+    {
+    }
+
+    public interface IPromise : IResolvePromise, IRejectPromise, ICancelPromise
+    {
+    }
+
+    public class UniTaskCompletionSource : IAwaiter, IPromise
+    {
+        // State(= AwaiterStatus)
         const int Pending = 0;
-        const int FulFilled = 1;
-        const int Rejected = 2;
+        const int Succeeded = 1;
+        const int Faulted = 2;
+        const int Canceled = 3;
 
         int state = 0;
-        T value;
-        ExceptionDispatchInfo exception;
+        bool handled = false;
+        ExceptionHolder exception;
         object continuation; // action or list
 
-        public bool IsCompleted => state != Pending;
+        AwaiterStatus IAwaiter.Status => (AwaiterStatus)state;
 
-        public Promise()
+        bool IAwaiter.IsCompleted => state != Pending;
+
+        public UniTask Task => new UniTask(this);
+
+        public UniTaskCompletionSource()
         {
-
+            TaskTracker.TrackActiveTask(this, 2);
         }
 
-        public Promise(Action<IResolve<T>, IReject> executor)
+        [Conditional("UNITY_EDITOR")]
+        internal void MarkHandled()
         {
-            try
+            if (!handled)
             {
-                executor(this, this);
-            }
-            catch (Exception ex)
-            {
-                SetException(ex);
-            }
-        }
-
-        public Promise(Action<IResolve<T>, IReject, object> executor, object state)
-        {
-            try
-            {
-                executor(this, this, state);
-            }
-            catch (Exception ex)
-            {
-                SetException(ex);
+                handled = true;
+                TaskTracker.RemoveTracking(this);
             }
         }
 
-        public T GetResult()
+        void IAwaiter.GetResult()
         {
-            if (state == FulFilled)
+            MarkHandled();
+
+            if (state == Succeeded)
             {
-                return value;
+                return;
             }
-            else if (state == Rejected)
+            else if (state == Faulted)
             {
-                if (exception == null)
+                exception.GetException().Throw();
+            }
+            else if (state == Canceled)
+            {
+                if (exception != null)
                 {
-                    exception = ExceptionDispatchInfo.Capture(new OperationCanceledException());
+                    exception.GetException().Throw(); // guranteed operation canceled exception.
                 }
 
-                exception.Throw();
+                throw new OperationCanceledException();
             }
-            else
+            else // Pending
             {
-                Interlocked.Exchange(ref continuation, CreateNewContinuation(continuation, out var mres));
-                mres.Wait();
-                return GetResult();
+                throw new NotSupportedException("UniTask does not allow call GetResult directly when task not completed. Please use 'await'.");
             }
-            return default(T);
         }
 
-        public void RegisterContinuation(Action action)
+        void ICriticalNotifyCompletion.UnsafeOnCompleted(Action action)
         {
             if (Interlocked.CompareExchange(ref continuation, (object)action, null) == null)
             {
@@ -149,97 +184,228 @@ namespace UniRx.Async
             }
         }
 
-        public void SetResult(T value)
+        public bool TrySetResult()
         {
-            if (Interlocked.CompareExchange(ref state, FulFilled, Pending) == Pending)
-            {
-                this.value = value;
-                TryInvokeContinuation();
-            }
-        }
-
-        public void SetException(Exception exception)
-        {
-            if (Interlocked.CompareExchange(ref state, Rejected, Pending) == Pending)
-            {
-                this.exception = ExceptionDispatchInfo.Capture(exception);
-                TryInvokeContinuation();
-            }
-        }
-
-        public void SetCanceled()
-        {
-            if (Interlocked.CompareExchange(ref state, Rejected, Pending) == Pending)
+            if (Interlocked.CompareExchange(ref state, Succeeded, Pending) == Pending)
             {
                 TryInvokeContinuation();
+                return true;
             }
+            return false;
         }
 
-        Action CreateNewContinuation(object currentContinuation, out ManualResetEventSlim mres)
+        public bool TrySetException(Exception exception)
         {
-            var mresEx = mres = new ManualResetEventSlim();
-            Action newContinuation = () =>
+            if (Interlocked.CompareExchange(ref state, Faulted, Pending) == Pending)
             {
-                if (currentContinuation != null)
-                {
-                    if (currentContinuation is Action)
-                    {
-                        ((Action)currentContinuation).Invoke();
-                    }
-                    else
-                    {
-                        var l = (List<Action>)currentContinuation;
-                        var cnt = l.Count;
-                        for (int i = 0; i < cnt; i++)
-                        {
-                            l[i].Invoke();
-                        }
-                    }
-                }
-                mresEx.Set();
-            };
-            return newContinuation;
+                this.exception = new ExceptionHolder(ExceptionDispatchInfo.Capture(exception));
+                TryInvokeContinuation();
+                return true;
+            }
+            return false;
+        }
+
+        public bool TrySetCanceled()
+        {
+            if (Interlocked.CompareExchange(ref state, Canceled, Pending) == Pending)
+            {
+                TryInvokeContinuation();
+                return true;
+            }
+            return false;
+        }
+
+        public bool TrySetCanceled(OperationCanceledException exception)
+        {
+            if (Interlocked.CompareExchange(ref state, Canceled, Pending) == Pending)
+            {
+                this.exception = new ExceptionHolder(ExceptionDispatchInfo.Capture(exception));
+                TryInvokeContinuation();
+                return true;
+            }
+            return false;
+        }
+
+        void INotifyCompletion.OnCompleted(Action continuation)
+        {
+            ((ICriticalNotifyCompletion)this).UnsafeOnCompleted(continuation);
         }
     }
 
-    internal sealed class LazyPromise<T> : IPromise<T>
+    public class UniTaskCompletionSource<T> : IAwaiter<T>, IPromise<T>
     {
-        Func<UniTask<T>> factory;
-        UniTask<T> value;
+        // State(= AwaiterStatus)
+        const int Pending = 0;
+        const int Succeeded = 1;
+        const int Faulted = 2;
+        const int Canceled = 3;
 
-        public LazyPromise(Func<UniTask<T>> factory)
+        int state = 0;
+        T value;
+        bool handled = false;
+        ExceptionHolder exception;
+        object continuation; // action or list
+
+        bool IAwaiter.IsCompleted => state != Pending;
+
+        public UniTask<T> Task => new UniTask<T>(this);
+        public UniTask UnitTask => new UniTask(this);
+
+        AwaiterStatus IAwaiter.Status => (AwaiterStatus)state;
+
+        public UniTaskCompletionSource()
         {
-            this.factory = factory;
+            TaskTracker.TrackActiveTask(this, 2);
         }
 
-        void Create()
+        [Conditional("UNITY_EDITOR")]
+        internal void MarkHandled()
         {
-            var f = Interlocked.Exchange(ref factory, null);
-            if (f != null)
+            if (!handled)
             {
-                value = f();
+                handled = true;
+                TaskTracker.RemoveTracking(this);
             }
         }
 
-        public bool IsCompleted
+        T IAwaiter<T>.GetResult()
         {
-            get
+            MarkHandled();
+
+            if (state == Succeeded)
             {
-                Create();
-                return value.IsCompleted;
+                return value;
+            }
+            else if (state == Faulted)
+            {
+                exception.GetException().Throw();
+            }
+            else if (state == Canceled)
+            {
+                if (exception != null)
+                {
+                    exception.GetException().Throw(); // guranteed operation canceled exception.
+                }
+
+                throw new OperationCanceledException();
+            }
+            else // Pending
+            {
+                throw new NotSupportedException("UniTask does not allow call GetResult directly when task not completed. Please use 'await'.");
+            }
+
+            return default(T);
+        }
+
+        void ICriticalNotifyCompletion.UnsafeOnCompleted(Action action)
+        {
+            if (Interlocked.CompareExchange(ref continuation, (object)action, null) == null)
+            {
+                if (state != Pending)
+                {
+                    TryInvokeContinuation();
+                }
+            }
+            else
+            {
+                var c = continuation;
+                if (c is Action)
+                {
+                    var list = new List<Action>();
+                    list.Add((Action)c);
+                    list.Add(action);
+                    if (Interlocked.CompareExchange(ref continuation, list, c) == c)
+                    {
+                        goto TRYINVOKE;
+                    }
+                }
+
+                var l = (List<Action>)continuation;
+                lock (l)
+                {
+                    l.Add(action);
+                }
+
+                TRYINVOKE:
+                if (state != Pending)
+                {
+                    TryInvokeContinuation();
+                }
             }
         }
 
-        public T GetResult()
+        void TryInvokeContinuation()
         {
-            Create();
-            return value.GetResult();
+            var c = Interlocked.Exchange(ref continuation, null);
+            if (c != null)
+            {
+                if (c is Action)
+                {
+                    ((Action)c).Invoke();
+                }
+                else
+                {
+                    var l = (List<Action>)c;
+                    var cnt = l.Count;
+                    for (int i = 0; i < cnt; i++)
+                    {
+                        l[i].Invoke();
+                    }
+                }
+            }
         }
 
-        public void RegisterContinuation(Action continuation)
+        public bool TrySetResult(T value)
         {
-            Create();
-            value.GetAwaiter().UnsafeOnCompleted(continuation);
+            if (Interlocked.CompareExchange(ref state, Succeeded, Pending) == Pending)
+            {
+                this.value = value;
+                TryInvokeContinuation();
+                return true;
+            }
+            return false;
+        }
+
+        public bool TrySetException(Exception exception)
+        {
+            if (Interlocked.CompareExchange(ref state, Faulted, Pending) == Pending)
+            {
+                this.exception = new ExceptionHolder(ExceptionDispatchInfo.Capture(exception));
+                TryInvokeContinuation();
+                return true;
+            }
+            return false;
+        }
+
+        public bool TrySetCanceled()
+        {
+            if (Interlocked.CompareExchange(ref state, Canceled, Pending) == Pending)
+            {
+                TryInvokeContinuation();
+                return true;
+            }
+            return false;
+        }
+
+        public bool TrySetCanceled(OperationCanceledException exception)
+        {
+            if (Interlocked.CompareExchange(ref state, Canceled, Pending) == Pending)
+            {
+                this.exception = new ExceptionHolder(ExceptionDispatchInfo.Capture(exception));
+                TryInvokeContinuation();
+                return true;
+            }
+            return false;
+        }
+
+        void IAwaiter.GetResult()
+        {
+            ((IAwaiter<T>)this).GetResult();
+        }
+
+        void INotifyCompletion.OnCompleted(Action continuation)
+        {
+            ((ICriticalNotifyCompletion)this).UnsafeOnCompleted(continuation);
         }
     }
 }

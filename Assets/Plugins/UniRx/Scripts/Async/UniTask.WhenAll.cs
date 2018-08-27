@@ -3,33 +3,47 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Threading;
+using UniRx.Async.Internal;
 
 namespace UniRx.Async
 {
     public partial struct UniTask
     {
+        // UniTask
+
         public static async UniTask<T[]> WhenAll<T>(params UniTask<T>[] tasks)
         {
-            return await new WhenAllPromise<T>(tasks);
+            return await new WhenAllPromise<T>(tasks, tasks.Length);
         }
 
         public static async UniTask<T[]> WhenAll<T>(IEnumerable<UniTask<T>> tasks)
         {
-            return await WhenAll(tasks.ToArray());
+            WhenAllPromise<T> promise;
+            using (var span = ArrayPoolUtil.Materialize(tasks))
+            {
+                promise = new WhenAllPromise<T>(span.Array, span.Length);
+            }
+
+            return await promise;
         }
 
         public static async UniTask WhenAll(params UniTask[] tasks)
         {
-            await new WhenAllPromise(tasks);
+            await new WhenAllPromise(tasks, tasks.Length);
         }
 
-        public static UniTask WhenAll(IEnumerable<UniTask> tasks)
+        public static async UniTask WhenAll(IEnumerable<UniTask> tasks)
         {
-            return WhenAll(tasks.ToArray());
+            WhenAllPromise promise;
+            using (var span = ArrayPoolUtil.Materialize(tasks))
+            {
+                promise = new WhenAllPromise(span.Array, span.Length);
+            }
+
+            await promise;
         }
 
         class WhenAllPromise<T>
@@ -39,16 +53,40 @@ namespace UniRx.Async
             Action whenComplete;
             ExceptionDispatchInfo exception;
 
-            public WhenAllPromise(UniTask<T>[] tasks)
+            public WhenAllPromise(UniTask<T>[] tasks, int tasksLength)
             {
                 this.completeCount = 0;
                 this.whenComplete = null;
                 this.exception = null;
-                this.result = new T[tasks.Length];
+                this.result = new T[tasksLength];
 
-                for (int i = 0; i < tasks.Length; i++)
+                for (int i = 0; i < tasksLength; i++)
                 {
-                    RunTask(tasks[i], i).Forget();
+                    if (tasks[i].IsCompleted)
+                    {
+                        T value = default(T);
+                        try
+                        {
+                            value = tasks[i].Result;
+                        }
+                        catch (Exception ex)
+                        {
+                            exception = ExceptionDispatchInfo.Capture(ex);
+                            TryCallContinuation();
+                            continue;
+                        }
+
+                        result[i] = value;
+                        var count = Interlocked.Increment(ref completeCount);
+                        if (count == result.Length)
+                        {
+                            TryCallContinuation();
+                        }
+                    }
+                    else
+                    {
+                        RunTask(tasks[i], i).Forget();
+                    }
                 }
             }
 
@@ -63,19 +101,22 @@ namespace UniRx.Async
 
             async UniTaskVoid RunTask(UniTask<T> task, int index)
             {
+                T value = default(T);
                 try
                 {
-                    var value = await task;
-                    result[index] = value;
-                    var count = Interlocked.Increment(ref completeCount);
-                    if (count == result.Length)
-                    {
-                        TryCallContinuation();
-                    }
+                    value = await task;
                 }
                 catch (Exception ex)
                 {
                     exception = ExceptionDispatchInfo.Capture(ex);
+                    TryCallContinuation();
+                    return;
+                }
+
+                result[index] = value;
+                var count = Interlocked.Increment(ref completeCount);
+                if (count == result.Length)
+                {
                     TryCallContinuation();
                 }
             }
@@ -139,16 +180,38 @@ namespace UniRx.Async
             Action whenComplete;
             ExceptionDispatchInfo exception;
 
-            public WhenAllPromise(UniTask[] tasks)
+            public WhenAllPromise(UniTask[] tasks, int tasksLength)
             {
                 this.completeCount = 0;
                 this.whenComplete = null;
                 this.exception = null;
-                this.resultLength = tasks.Length;
+                this.resultLength = tasksLength;
 
-                for (int i = 0; i < tasks.Length; i++)
+                for (int i = 0; i < tasksLength; i++)
                 {
-                    RunTask(tasks[i], i).Forget();
+                    if (tasks[i].IsCompleted)
+                    {
+                        try
+                        {
+                            tasks[i].GetResult();
+                        }
+                        catch (Exception ex)
+                        {
+                            exception = ExceptionDispatchInfo.Capture(ex);
+                            TryCallContinuation();
+                            continue;
+                        }
+
+                        var count = Interlocked.Increment(ref completeCount);
+                        if (count == resultLength)
+                        {
+                            TryCallContinuation();
+                        }
+                    }
+                    else
+                    {
+                        RunTask(tasks[i], i).Forget();
+                    }
                 }
             }
 
@@ -166,15 +229,17 @@ namespace UniRx.Async
                 try
                 {
                     await task;
-                    var count = Interlocked.Increment(ref completeCount);
-                    if (count == resultLength)
-                    {
-                        TryCallContinuation();
-                    }
                 }
                 catch (Exception ex)
                 {
                     exception = ExceptionDispatchInfo.Capture(ex);
+                    TryCallContinuation();
+                    return;
+                }
+
+                var count = Interlocked.Increment(ref completeCount);
+                if (count == resultLength)
+                {
                     TryCallContinuation();
                 }
             }

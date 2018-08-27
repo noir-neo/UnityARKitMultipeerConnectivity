@@ -1,8 +1,14 @@
-﻿using System;
+﻿#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
+
+using System;
 using System.Collections.Generic;
 using System.Threading;
 #if !UniRxLibrary
 using UnityEngine;
+#endif
+#if CSHARP_7_OR_LATER
+using UniRx.Async;
+using UniRx.Async.Internal;
 #endif
 
 namespace UniRx
@@ -11,6 +17,10 @@ namespace UniRx
     {
         T Value { get; }
         bool HasValue { get; }
+
+#if (CSHARP_7_OR_LATER)
+        UniTask<T> WaitUntilValueChangedAsync(CancellationToken cancellationToken);
+#endif
     }
 
     public interface IReactiveProperty<T> : IReadOnlyReactiveProperty<T>
@@ -108,7 +118,8 @@ namespace UniRx
                 if (!EqualityComparer.Equals(this.value, value))
                 {
                     SetValue(value);
-                    if (isDisposed) return;
+                    if (isDisposed)
+                        return;
 
                     RaiseOnNext(ref value);
                 }
@@ -143,6 +154,14 @@ namespace UniRx
                 node.OnNext(value);
                 node = node.Next;
             }
+
+#if (CSHARP_7_OR_LATER)
+            commonPromise?.InvokeContinuation(ref value);
+            if (removablePromises != null)
+            {
+                PromiseHelper.TrySetResultAll(removablePromises.Values, value);
+            }
+#endif
         }
 
         protected virtual void SetValue(T value)
@@ -153,7 +172,8 @@ namespace UniRx
         public void SetValueAndForceNotify(T value)
         {
             SetValue(value);
-            if (isDisposed) return;
+            if (isDisposed)
+                return;
 
             RaiseOnNext(ref value);
         }
@@ -224,6 +244,19 @@ namespace UniRx
                 node.OnCompleted();
                 node = node.Next;
             }
+#if (CSHARP_7_OR_LATER)
+            commonPromise?.SetCanceled();
+            commonPromise = null;
+            if (removablePromises != null)
+            {
+                foreach (var item in removablePromises)
+                {
+                    item.Value.SetCanceled();
+                }
+                removablePromises = null;
+            }
+#endif
+
         }
 
         public override string ToString()
@@ -235,6 +268,52 @@ namespace UniRx
         {
             return false;
         }
+
+
+#if (CSHARP_7_OR_LATER)
+
+        static readonly Action<object> Callback = CancelCallback;
+        ReactivePropertyReusablePromise<T> commonPromise;
+        Dictionary<CancellationToken, ReactivePropertyReusablePromise<T>> removablePromises;
+
+        public UniTask<T> WaitUntilValueChangedAsync(CancellationToken cancellationToken)
+        {
+            if (isDisposed) throw new ObjectDisposedException("ReactiveProperty");
+
+            if (!cancellationToken.CanBeCanceled)
+            {
+                if (commonPromise != null) return commonPromise.Task;
+                commonPromise = new ReactivePropertyReusablePromise<T>(CancellationToken.None);
+                return commonPromise.Task;
+            }
+
+            if (removablePromises == null)
+            {
+                removablePromises = new Dictionary<CancellationToken, ReactivePropertyReusablePromise<T>>(CancellationTokenEqualityComparer.Default);
+            }
+
+            if (removablePromises.TryGetValue(cancellationToken, out var newPromise))
+            {
+                return newPromise.Task;
+            }
+
+            newPromise = new ReactivePropertyReusablePromise<T>(cancellationToken);
+            removablePromises.Add(cancellationToken, newPromise);
+            cancellationToken.Register(Callback, Tuple.Create(this, newPromise), false);
+
+            return newPromise.Task;
+        }
+
+        static void CancelCallback(object state)
+        {
+            var tuple = (Tuple<ReactiveProperty<T>, ReactivePropertyReusablePromise<T>>)state;
+            if (tuple.Item1.isDisposed) return;
+
+            tuple.Item2.SetCanceled();
+            tuple.Item1.removablePromises.Remove(tuple.Item2.RegisteredCancelationToken);
+        }
+
+#endif
     }
 
     /// <summary>
@@ -369,6 +448,7 @@ namespace UniRx
         protected virtual void Dispose(bool disposing)
         {
             if (isDisposed) return;
+            sourceConnection.Dispose();
 
             var node = root;
             root = last = null;
@@ -379,6 +459,19 @@ namespace UniRx
                 node.OnCompleted();
                 node = node.Next;
             }
+
+#if (CSHARP_7_OR_LATER)
+            commonPromise?.SetCanceled();
+            commonPromise = null;
+            if (removablePromises != null)
+            {
+                foreach (var item in removablePromises)
+                {
+                    item.Value.SetCanceled();
+                }
+                removablePromises = null;
+            }
+#endif
         }
 
         void IObserverLinkedList<T>.UnsubscribeNode(ObserverNode<T> node)
@@ -426,6 +519,14 @@ namespace UniRx
                 node.OnNext(value);
                 node = node.Next;
             }
+
+#if (CSHARP_7_OR_LATER)
+            commonPromise?.InvokeContinuation(ref value);
+            if (removablePromises != null)
+            {
+                PromiseHelper.TrySetResultAll(removablePromises.Values, value);
+            }
+#endif
         }
 
         void IObserver<T>.OnError(Exception error)
@@ -435,7 +536,7 @@ namespace UniRx
             // call source.OnError
             var node = root;
             while (node != null)
-            {
+            { 
                 node.OnError(error);
                 node = node.Next;
             }
@@ -458,6 +559,51 @@ namespace UniRx
         {
             return false;
         }
+
+#if (CSHARP_7_OR_LATER)
+
+        static readonly Action<object> Callback = CancelCallback;
+        ReactivePropertyReusablePromise<T> commonPromise;
+        Dictionary<CancellationToken, ReactivePropertyReusablePromise<T>> removablePromises;
+
+        public UniTask<T> WaitUntilValueChangedAsync(CancellationToken cancellationToken)
+        {
+            if (isDisposed) throw new ObjectDisposedException("ReadOnlyReactiveProperty");
+
+            if (!cancellationToken.CanBeCanceled)
+            {
+                if (commonPromise != null) return commonPromise.Task;
+                commonPromise = new ReactivePropertyReusablePromise<T>(CancellationToken.None);
+                return commonPromise.Task;
+            }
+
+            if (removablePromises == null)
+            {
+                removablePromises = new Dictionary<CancellationToken, ReactivePropertyReusablePromise<T>>(CancellationTokenEqualityComparer.Default);
+            }
+
+            if (removablePromises.TryGetValue(cancellationToken, out var newPromise))
+            {
+                return newPromise.Task;
+            }
+
+            newPromise = new ReactivePropertyReusablePromise<T>(cancellationToken);
+            removablePromises.Add(cancellationToken, newPromise);
+            cancellationToken.Register(Callback, Tuple.Create(this, newPromise), false);
+
+            return newPromise.Task;
+        }
+
+        static void CancelCallback(object state)
+        {
+            var tuple = (Tuple<ReadOnlyReactiveProperty<T>, ReactivePropertyReusablePromise<T>>)state;
+            if (tuple.Item1.isDisposed) return;
+
+            tuple.Item2.SetCanceled();
+            tuple.Item1.removablePromises.Remove(tuple.Item2.RegisteredCancelationToken);
+        }
+
+#endif
     }
 
     /// <summary>
@@ -479,6 +625,16 @@ namespace UniRx
         {
             return new ReadOnlyReactiveProperty<T>(source);
         }
+
+#if (CSHARP_7_OR_LATER)
+
+        public static UniTask<T>.Awaiter GetAwaiter<T>(this IReadOnlyReactiveProperty<T> source)
+        {
+            return source.WaitUntilValueChangedAsync(CancellationToken.None).GetAwaiter();
+        }
+
+#endif
+
 
         /// <summary>
         /// Create ReadOnlyReactiveProperty with distinctUntilChanged: false.
@@ -517,7 +673,8 @@ namespace UniRx
             {
                 foreach (var item in xs)
                 {
-                    if (item == false) return false;
+                    if (item == false)
+                        return false;
                 }
                 return true;
             });
@@ -533,7 +690,8 @@ namespace UniRx
             {
                 foreach (var item in xs)
                 {
-                    if (item == true) return false;
+                    if (item == true)
+                        return false;
                 }
                 return true;
             });

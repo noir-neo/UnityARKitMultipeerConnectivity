@@ -5,6 +5,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using UniRx.InternalUtil;
 using UniRx.Triggers;
 using UnityEngine;
 using System.Threading;
@@ -151,7 +152,7 @@ namespace UniRx
             {
                 if (reThrowOnError && HasError)
                 {
-                    throw Error;
+                    Error.Throw();
                 }
 
                 return false;
@@ -550,7 +551,7 @@ namespace UniRx
 
         public static IObservable<T> FromCoroutine<T>(Func<IObserver<T>, IEnumerator> coroutine)
         {
-            return FromCoroutine<T>((observer, cancellationToken) => WrapToCancellableEnumerator(coroutine(observer), cancellationToken));
+            return FromCoroutine<T>((observer, cancellationToken) => WrapToCancellableEnumerator(coroutine(observer), observer, cancellationToken));
         }
 
         /// <summary>
@@ -559,10 +560,10 @@ namespace UniRx
         /// </summary>
         public static IObservable<T> FromMicroCoroutine<T>(Func<IObserver<T>, IEnumerator> coroutine, FrameCountType frameCountType = FrameCountType.Update)
         {
-            return FromMicroCoroutine<T>((observer, cancellationToken) => WrapToCancellableEnumerator(coroutine(observer), cancellationToken), frameCountType);
+            return FromMicroCoroutine<T>((observer, cancellationToken) => WrapToCancellableEnumerator(coroutine(observer), observer, cancellationToken), frameCountType);
         }
 
-        static IEnumerator WrapToCancellableEnumerator(IEnumerator enumerator, CancellationToken cancellationToken)
+        static IEnumerator WrapToCancellableEnumerator<T>(IEnumerator enumerator, IObserver<T> observer, CancellationToken cancellationToken)
         {
             var hasNext = default(bool);
             do
@@ -571,12 +572,19 @@ namespace UniRx
                 {
                     hasNext = enumerator.MoveNext();
                 }
-                catch
+                catch (Exception ex)
                 {
-                    var d = enumerator as IDisposable;
-                    if (d != null)
+                    try
                     {
-                        d.Dispose();
+                        observer.OnError(ex);
+                    }
+                    finally
+                    {
+                        var d = enumerator as IDisposable;
+                        if (d != null)
+                        {
+                            d.Dispose();
+                        }
                     }
                     yield break;
                 }
@@ -1136,7 +1144,7 @@ namespace UniRx
         internal static class Stubs
         {
             public static readonly Action Nop = () => { };
-            public static readonly Action<Exception> Throw = ex => { throw ex; };
+            public static readonly Action<Exception> Throw = ex => { ex.Throw(); };
 
             // Stubs<T>.Ignore can't avoid iOS AOT problem.
             public static void Ignore<T>(T t)

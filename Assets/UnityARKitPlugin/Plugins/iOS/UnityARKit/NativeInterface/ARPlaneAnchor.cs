@@ -48,7 +48,7 @@ namespace UnityEngine.XR.iOS
          */
 		public UnityARPlaneGeometry planeGeometry;
 
-		public string identifierStr { get { return Marshal.PtrToStringAuto(this.ptrIdentifier); } }
+		public string identifierStr { get; set; }
 
 	}
 
@@ -137,6 +137,7 @@ namespace UnityEngine.XR.iOS
 		public ARPlaneAnchor (UnityARAnchorData ufad)
 		{
 			planeAnchorData = ufad;
+			planeAnchorData.identifierStr = Marshal.PtrToStringAuto(planeAnchorData.ptrIdentifier);
 		}
 
 

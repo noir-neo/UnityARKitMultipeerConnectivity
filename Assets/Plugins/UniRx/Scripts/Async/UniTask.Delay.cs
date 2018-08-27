@@ -2,95 +2,119 @@
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
 
 using System;
+using System.Runtime.CompilerServices;
 using System.Threading;
+using UniRx.Async.Internal;
 using UnityEngine;
 
 namespace UniRx.Async
 {
     public partial struct UniTask
     {
-        public static UniTask Yield(PlayerLoopTiming timing = PlayerLoopTiming.Update, CancellationToken cancellationToken = default(CancellationToken))
+        public static YieldAwaitable Yield(PlayerLoopTiming timing = PlayerLoopTiming.Update)
         {
-            var source = new YieldPromise(cancellationToken);
-            PlayerLoopHelper.AddAction(timing, source);
-            return source.Task;
+            // optimized for single continuation
+            return new YieldAwaitable(timing);
         }
 
-        public static UniTask<int> Delay(int delayFrameCount, PlayerLoopTiming delayTiming = PlayerLoopTiming.Update, CancellationToken cancellationToken = default(CancellationToken))
+        public static UniTask Yield(PlayerLoopTiming timing, CancellationToken cancellationToken)
+        {
+            return new UniTask(new YieldPromise(timing, cancellationToken));
+        }
+
+        public static UniTask<int> DelayFrame(int delayFrameCount, PlayerLoopTiming delayTiming = PlayerLoopTiming.Update, CancellationToken cancellationToken = default(CancellationToken))
         {
             if (delayFrameCount < 0)
             {
                 throw new ArgumentOutOfRangeException("Delay does not allow minus delayFrameCount. delayFrameCount:" + delayFrameCount);
             }
 
-            var source = new DelayPromise(delayFrameCount, cancellationToken);
-            PlayerLoopHelper.AddAction(delayTiming, source);
+            var source = new DelayFramePromise(delayFrameCount, delayTiming, cancellationToken);
             return source.Task;
         }
 
-        public static UniTask Delay(TimeSpan delayTimeSpan, PlayerLoopTiming delayTiming = PlayerLoopTiming.Update, CancellationToken cancellationToken = default(CancellationToken))
+        public static UniTask Delay(int millisecondsDelay, bool ignoreTimeScale = false, PlayerLoopTiming delayTiming = PlayerLoopTiming.Update, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            var delayTimeSpan = TimeSpan.FromMilliseconds(millisecondsDelay);
+            if (delayTimeSpan < TimeSpan.Zero)
+            {
+                throw new ArgumentOutOfRangeException("Delay does not allow minus delayFrameCount. delayTimeSpan:" + delayTimeSpan);
+            }
+
+            return (ignoreTimeScale)
+                ? new DelayIgnoreTimeScalePromise(delayTimeSpan, delayTiming, cancellationToken).Task
+                : new DelayPromise(delayTimeSpan, delayTiming, cancellationToken).Task;
+        }
+
+        public static UniTask Delay(TimeSpan delayTimeSpan, bool ignoreTimeScale = false, PlayerLoopTiming delayTiming = PlayerLoopTiming.Update, CancellationToken cancellationToken = default(CancellationToken))
         {
             if (delayTimeSpan < TimeSpan.Zero)
             {
                 throw new ArgumentOutOfRangeException("Delay does not allow minus delayFrameCount. delayTimeSpan:" + delayTimeSpan);
             }
 
-            var source = new DelayTimeSpanPromise(delayTimeSpan, cancellationToken);
-            PlayerLoopHelper.AddAction(delayTiming, source);
-            return source.Task;
+            return (ignoreTimeScale)
+                ? new DelayIgnoreTimeScalePromise(delayTimeSpan, delayTiming, cancellationToken).Task
+                : new DelayPromise(delayTimeSpan, delayTiming, cancellationToken).Task;
         }
 
-        class YieldPromise : Promise<AsyncUnit>, IPlayerLoopItem
+        class YieldPromise : PlayerLoopReusablePromiseBase
         {
-            CancellationToken cancellation;
-
-            public UniTask Task => new UniTask(this);
-
-            public YieldPromise(CancellationToken cancellation)
+            public YieldPromise(PlayerLoopTiming timing, CancellationToken cancellationToken)
+                : base(timing, cancellationToken, 2)
             {
-                this.cancellation = cancellation;
             }
 
-            public bool MoveNext()
+            protected override void OnRunningStart()
             {
-                if (cancellation.IsCancellationRequested)
+            }
+
+            public override bool MoveNext()
+            {
+                Complete();
+                if (cancellationToken.IsCancellationRequested)
                 {
-                    SetCanceled();
-                    return false;
+                    TrySetCanceled();
+                }
+                else
+                {
+                    TrySetResult();
                 }
 
-                SetResult(AsyncUnit.Default);
                 return false;
             }
         }
 
-        class DelayPromise : Promise<int>, IPlayerLoopItem
+        class DelayFramePromise : PlayerLoopReusablePromiseBase<int>
         {
             readonly int delayFrameCount;
-            CancellationToken cancellation;
-
             int currentFrameCount;
 
-            public UniTask<int> Task => new UniTask<int>(this);
-
-            public DelayPromise(int delayFrameCount, CancellationToken cancellation)
+            public DelayFramePromise(int delayFrameCount, PlayerLoopTiming timing, CancellationToken cancellationToken)
+                : base(timing, cancellationToken, 2)
             {
                 this.delayFrameCount = delayFrameCount;
-                this.cancellation = cancellation;
                 this.currentFrameCount = 0;
             }
 
-            public bool MoveNext()
+            protected override void OnRunningStart()
             {
-                if (cancellation.IsCancellationRequested)
+                currentFrameCount = 0;
+            }
+
+            public override bool MoveNext()
+            {
+                if (cancellationToken.IsCancellationRequested)
                 {
-                    SetCanceled();
+                    Complete();
+                    TrySetCanceled();
                     return false;
                 }
 
                 if (currentFrameCount == delayFrameCount)
                 {
-                    SetResult(currentFrameCount);
+                    Complete();
+                    TrySetResult(currentFrameCount);
                     return false;
                 }
 
@@ -99,39 +123,122 @@ namespace UniRx.Async
             }
         }
 
-        class DelayTimeSpanPromise : Promise<AsyncUnit>, IPlayerLoopItem
+        class DelayPromise : PlayerLoopReusablePromiseBase
         {
-            readonly double delayFrameTimeSpan;
-            CancellationToken cancellation;
+            readonly float delayFrameTimeSpan;
+            float elapsed;
 
-            float initialTime;
-
-            public UniTask Task => new UniTask(this);
-
-            public DelayTimeSpanPromise(TimeSpan delayFrameTimeSpan, CancellationToken cancellation)
+            public DelayPromise(TimeSpan delayFrameTimeSpan, PlayerLoopTiming timing, CancellationToken cancellationToken)
+                : base(timing, cancellationToken, 2)
             {
-                this.delayFrameTimeSpan = delayFrameTimeSpan.TotalSeconds;
-                this.cancellation = cancellation;
-                this.initialTime = Time.realtimeSinceStartup;
+                this.delayFrameTimeSpan = (float)delayFrameTimeSpan.TotalSeconds;
             }
 
-            public bool MoveNext()
+            protected override void OnRunningStart()
             {
-                if (cancellation.IsCancellationRequested)
+                this.elapsed = 0.0f;
+            }
+
+            public override bool MoveNext()
+            {
+                if (cancellationToken.IsCancellationRequested)
                 {
-                    SetCanceled();
+                    Complete();
+                    TrySetCanceled();
                     return false;
                 }
 
-                var diff = Time.realtimeSinceStartup - initialTime;
-
-                if (diff >= delayFrameTimeSpan)
+                elapsed += Time.deltaTime;
+                if (elapsed >= delayFrameTimeSpan)
                 {
-                    SetResult(default(AsyncUnit));
+                    Complete();
+                    TrySetResult();
                     return false;
                 }
 
                 return true;
+            }
+        }
+
+        class DelayIgnoreTimeScalePromise : PlayerLoopReusablePromiseBase
+        {
+            readonly float delayFrameTimeSpan;
+            float elapsed;
+
+            public DelayIgnoreTimeScalePromise(TimeSpan delayFrameTimeSpan, PlayerLoopTiming timing, CancellationToken cancellationToken)
+                : base(timing, cancellationToken, 2)
+            {
+                this.delayFrameTimeSpan = (float)delayFrameTimeSpan.TotalSeconds;
+            }
+
+            protected override void OnRunningStart()
+            {
+                this.elapsed = 0.0f;
+            }
+
+            public override bool MoveNext()
+            {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    Complete();
+                    TrySetCanceled();
+                    return false;
+                }
+
+                elapsed += Time.unscaledDeltaTime;
+
+                if (elapsed >= delayFrameTimeSpan)
+                {
+                    Complete();
+                    TrySetResult();
+                    return false;
+                }
+
+                return true;
+            }
+        }
+    }
+
+    public struct YieldAwaitable
+    {
+        readonly PlayerLoopTiming timing;
+
+        public YieldAwaitable(PlayerLoopTiming timing)
+        {
+            this.timing = timing;
+        }
+
+        public Awaiter GetAwaiter()
+        {
+            return new Awaiter(timing);
+        }
+
+        public UniTask ToUniTask()
+        {
+            return UniTask.Yield(timing, CancellationToken.None);
+        }
+
+        public struct Awaiter : ICriticalNotifyCompletion
+        {
+            readonly PlayerLoopTiming timing;
+
+            public Awaiter(PlayerLoopTiming timing)
+            {
+                this.timing = timing;
+            }
+
+            public bool IsCompleted => false;
+
+            public void GetResult() { }
+
+            public void OnCompleted(Action continuation)
+            {
+                PlayerLoopHelper.AddContinuation(timing, continuation);
+            }
+
+            public void UnsafeOnCompleted(Action continuation)
+            {
+                PlayerLoopHelper.AddContinuation(timing, continuation);
             }
         }
     }
