@@ -91,12 +91,12 @@ namespace UnityEngine.XR.iOS
         public static UnityARUserAnchorData UnityARUserAnchorDataFromGameObject(GameObject go)
         {
             // create an anchor data struct from a game object transform
-            Matrix4x4 matrix = Matrix4x4.TRS(go.transform.position, go.transform.rotation, go.transform.localScale);
-            UnityARUserAnchorData ad = new UnityARUserAnchorData();
-            ad.transform.column0 = matrix.GetColumn(0);
-            ad.transform.column1 = matrix.GetColumn(1);
-            ad.transform.column2 = matrix.GetColumn(2);
-            ad.transform.column3 = matrix.GetColumn(3);
+            Matrix4x4 arkitTransform = UnityARMatrixOps.UnityToARKitCoordChange(go.transform.position, go.transform.rotation);
+           UnityARUserAnchorData ad = new UnityARUserAnchorData();
+            ad.transform.column0 = arkitTransform.GetColumn(0);
+            ad.transform.column1 = arkitTransform.GetColumn(1);
+            ad.transform.column2 = arkitTransform.GetColumn(2);
+            ad.transform.column3 = arkitTransform.GetColumn(3);
             return ad;
         }
     }
@@ -403,6 +403,12 @@ namespace UnityEngine.XR.iOS
             internal_ARFaceAnchorRemoved faceAnchorRemovedCallback);
 
         [DllImport("__Internal")]
+        private static extern IntPtr session_GetARKitSessionPtr(IntPtr nativeSession);
+
+        [DllImport("__Internal")]
+        private static extern IntPtr session_GetARKitFramePtr(IntPtr nativeSession);
+    
+        [DllImport("__Internal")]
         private static extern void StartWorldTrackingSession(IntPtr nativeSession, ARKitWorldTrackingSessionConfiguration configuration);
 
         [DllImport("__Internal")]
@@ -548,6 +554,24 @@ namespace UnityEngine.XR.iOS
                 s_UnityARSessionNativeInterface = new UnityARSessionNativeInterface();
             }
             return s_UnityARSessionNativeInterface;
+        }
+
+        public IntPtr GetNativeSessionPtr()
+        {
+#if !UNITY_EDITOR && UNITY_IOS
+            return session_GetARKitSessionPtr(m_NativeARSession);
+#else
+            return IntPtr.Zero;
+#endif
+        }
+
+        public IntPtr GetNativeFramePtr()
+        {
+#if !UNITY_EDITOR && UNITY_IOS
+            return session_GetARKitFramePtr(m_NativeARSession);
+#else
+            return IntPtr.Zero;
+#endif
         }
 
 #if UNITY_EDITOR
