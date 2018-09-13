@@ -83,7 +83,7 @@ PluginImporter:
       settings:
         AddToEmbeddedBinaries: false
         CompileFlags: 
-        FrameworkDependencies: 
+        FrameworkDependencies: ARKit;
   - first:
       tvOS: tvOS
     second:

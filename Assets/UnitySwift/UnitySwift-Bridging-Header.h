@@ -6,3 +6,4 @@
 #import <UIKit/UIKit.h>
 #import "UnityInterface.h"
 #import "MCDefines.h"
+#import "MCPeerID+Unity.h"

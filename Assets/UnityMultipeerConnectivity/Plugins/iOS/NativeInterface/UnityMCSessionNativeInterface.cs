@@ -23,6 +23,10 @@ namespace UnityMultipeerConnectivity
         static event Action<UnityARUserAnchorData> AnchorReceivedInternal;
         delegate void internal_AnchorReceived(IntPtr anchorPtr);
 
+        public event Action<UnityMCPeerID, UnityMCSessionState> StateChangedEvent;
+        static event Action<UnityMCPeerID, UnityMCSessionState> StateChangedInternal;
+        delegate void internal_StateChanged(UnityMCPeerID peerId, UnityMCSessionState sessionState);
+
 #if !UNITY_EDITOR && UNITY_IOS
         readonly IntPtr nativeMCSession;
 #endif
@@ -31,9 +35,10 @@ namespace UnityMultipeerConnectivity
         {
             WorldMapReceivedEventInternal += WorldMapReceived;
             AnchorReceivedInternal += AnchorReceived;
+            StateChangedInternal += StateChanged;
 #if !UNITY_EDITOR && UNITY_IOS
             nativeMCSession = _createNativeMCSession();
-            _setCallbacks(nativeMCSession, _world_map_received, _anchor_received);
+            _setCallbacks(nativeMCSession, _world_map_received, _anchor_received, _state_changed);
 #endif
         }
 
@@ -41,6 +46,7 @@ namespace UnityMultipeerConnectivity
         {
             WorldMapReceivedEventInternal -= WorldMapReceived;
             AnchorReceivedInternal -= AnchorReceived;
+            StateChangedInternal -= StateChanged;
         }
 
 #if !UNITY_EDITOR && UNITY_IOS
@@ -48,7 +54,7 @@ namespace UnityMultipeerConnectivity
         static extern IntPtr _createNativeMCSession();
 
         [DllImport("__Internal")]
-        static extern void _setCallbacks(IntPtr nativeSession, internal_WorldMapReceived worldMapReceivedCallback, internal_AnchorReceived anchorReceivedCallback);
+        static extern void _setCallbacks(IntPtr nativeSession, internal_WorldMapReceived worldMapReceivedCallback, internal_AnchorReceived anchorReceivedCallback,  internal_StateChanged stateChangedCallback);
 
         [DllImport("__Internal")]
         static extern void _sendARWorldMapToAllPeers(IntPtr nativeSession, IntPtr dataPtr);
@@ -98,6 +104,12 @@ namespace UnityMultipeerConnectivity
             AnchorReceivedInternal?.Invoke(anchorData);
         }
 
+        [MonoPInvokeCallback(typeof(internal_StateChanged))]
+        static void _state_changed(UnityMCPeerID peerId, UnityMCSessionState sessionState)
+        {
+            StateChangedInternal?.Invoke(peerId, sessionState);
+        }
+
         void WorldMapReceived(ARWorldMap worldMap)
         {
             WorldMapReceivedEvent?.Invoke(worldMap);
@@ -106,6 +118,11 @@ namespace UnityMultipeerConnectivity
         void AnchorReceived(UnityARUserAnchorData anchorData)
         {
             AnchorReceivedEvent?.Invoke(anchorData);
+        }
+
+        void StateChanged(UnityMCPeerID peerId, UnityMCSessionState sessionState)
+        {
+            StateChangedEvent?.Invoke(peerId, sessionState);
         }
     }
 }

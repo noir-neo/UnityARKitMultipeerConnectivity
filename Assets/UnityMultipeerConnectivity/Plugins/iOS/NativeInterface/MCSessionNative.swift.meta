@@ -83,7 +83,7 @@ PluginImporter:
       settings:
         AddToEmbeddedBinaries: false
         CompileFlags: 
-        FrameworkDependencies: MultipeerConnectivity;
+        FrameworkDependencies: ARKit;MultipeerConnectivity;
   - first:
       tvOS: tvOS
     second:

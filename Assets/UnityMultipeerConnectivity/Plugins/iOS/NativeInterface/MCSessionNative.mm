@@ -1,6 +1,5 @@
 #import <Foundation/Foundation.h>
 #import <ARKit/ARKit.h>
-#import <MultipeerConnectivity/MultipeerConnectivity.h>
 #import "unityswift-Swift.h"
 #import "ARKitDefines.h"
 
@@ -25,10 +24,13 @@ extern "C" {
         ARAnchor *anchor = [[ARAnchor alloc] initWithTransform:matrix];
         [session sendToAllPeers:(ARAnchor*) anchor];
     }
-
-    void _setCallbacks(const void* nativeSession, UNITY_MC_WORLD_MAP_CALLBACK worldMapReceived, UNITY_MC_ANCHOR_CALLBACK anchorReceived) {
+    
+    void _setCallbacks(const void* nativeSession, UNITY_MC_WORLD_MAP_CALLBACK worldMapReceived, UNITY_MC_ANCHOR_CALLBACK anchorReceived, UNITY_MC_STATE_CALLBACK stateChanged) {
         UnityMCSession* session = (__bridge UnityMCSession*)nativeSession;
-        [session setCallbacks:(UNITY_MC_WORLD_MAP_CALLBACK) worldMapReceived anchorReceived: (UNITY_MC_ANCHOR_CALLBACK) anchorReceived];
+        [session setCallbacks:(UNITY_MC_WORLD_MAP_CALLBACK) worldMapReceived
+            anchorReceived:(UNITY_MC_ANCHOR_CALLBACK) anchorReceived
+            stateChanged:(UNITY_MC_STATE_CALLBACK) stateChanged
+            ];
     }
     
     UnityARUserAnchorData _unityARUserAnchorDataFromARAnchorPtr(const void* anchorPtr) {

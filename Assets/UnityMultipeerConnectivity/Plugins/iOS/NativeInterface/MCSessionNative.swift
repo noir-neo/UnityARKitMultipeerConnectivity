@@ -20,7 +20,8 @@ class UnityMCSession: NSObject {
     
     private var worldMapReceived: UNITY_MC_WORLD_MAP_CALLBACK!
     private var anchorReceived: UNITY_MC_ANCHOR_CALLBACK!
-
+    private var stateChanged: UNITY_MC_STATE_CALLBACK!
+    
     override init() {
         super.init()
         
@@ -51,11 +52,12 @@ class UnityMCSession: NSObject {
         }
     }
     
-    func setCallbacks(_ worldMapReceived: @escaping UNITY_MC_WORLD_MAP_CALLBACK, anchorReceived: @escaping UNITY_MC_ANCHOR_CALLBACK) {
+    func setCallbacks(_ worldMapReceived: @escaping UNITY_MC_WORLD_MAP_CALLBACK, anchorReceived: @escaping UNITY_MC_ANCHOR_CALLBACK, stateChanged: @escaping UNITY_MC_STATE_CALLBACK) {
         self.worldMapReceived = worldMapReceived
         self.anchorReceived = anchorReceived
+        self.stateChanged = stateChanged
     }
-
+    
     func receivedDataHandler(_ data: Data, from peer: MCPeerID) {
         
         if let unarchived = try? NSKeyedUnarchiver.unarchivedObject(ofClasses: [ARWorldMap.classForKeyedUnarchiver()], from: data),
@@ -77,6 +79,11 @@ class UnityMCSession: NSObject {
         }
     }
     
+    func stateChangedHandler(_ peerID: MCPeerID, didChange state: MCSessionState)
+    {
+        stateChanged(peerID.toUnity(), state.toUnity())
+    }
+    
     var connectedPeers: [MCPeerID] {
         return session.connectedPeers
     }
@@ -85,7 +92,7 @@ class UnityMCSession: NSObject {
 extension UnityMCSession: MCSessionDelegate {
     
     public func session(_ session: MCSession, peer peerID: MCPeerID, didChange state: MCSessionState) {
-        // not used
+        stateChangedHandler(peerID, didChange: state)
     }
     
     public func session(_ session: MCSession, didReceive data: Data, fromPeer peerID: MCPeerID) {
