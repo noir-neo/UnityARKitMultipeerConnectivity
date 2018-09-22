@@ -7,5 +7,6 @@ Using the MultipeerConnectivity framework to share AR world between nearby devic
 ## Requirements
 
 - Unity 2017.1+
+  + Examples are dependent on Unity 2018.2+
 - iOS 12.0+
 - Xcode 10.0+
