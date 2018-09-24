@@ -64,15 +64,19 @@ class UnityMCSession: NSObject {
             let worldMap = unarchived as? ARWorldMap {
             let unmanaged = Unmanaged.passRetained(worldMap)
             let ptr = unmanaged.toOpaque()
-            worldMapReceived(ptr)
-            unmanaged.release()
+            DispatchQueue.main.async {
+                self.worldMapReceived(ptr)
+                unmanaged.release()
+            }
         }
         else if let unarchived = try? NSKeyedUnarchiver.unarchivedObject(ofClasses: [ARAnchor.classForKeyedUnarchiver()], from: data),
             let anchor = unarchived as? ARAnchor {
             let unmanaged = Unmanaged.passRetained(anchor)
             let ptr = unmanaged.toOpaque()
-            anchorReceived(ptr)
-            unmanaged.release()
+            DispatchQueue.main.async {
+                self.anchorReceived(ptr)
+                unmanaged.release()
+            }
         }
         else {
             print("unknown data recieved from \(peer)")
@@ -81,7 +85,9 @@ class UnityMCSession: NSObject {
     
     func stateChangedHandler(_ peerID: MCPeerID, didChange state: MCSessionState)
     {
-        stateChanged(peerID.toUnity(), state.toUnity())
+        DispatchQueue.main.async {
+            self.stateChanged(peerID.toUnity(), state.toUnity())
+        }
     }
     
     var connectedPeers: [MCPeerID] {
