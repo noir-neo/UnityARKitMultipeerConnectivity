@@ -58,14 +58,14 @@ class UnityMCSession: NSObject {
 
     func receivedDataHandler(_ data: Data, from peer: MCPeerID) {
         
-        if let unarchived = try? NSKeyedUnarchiver.unarchivedObject(of: ARWorldMap.classForKeyedUnarchiver(), from: data),
+        if let unarchived = try? NSKeyedUnarchiver.unarchivedObject(ofClasses: [ARWorldMap.classForKeyedUnarchiver()], from: data),
             let worldMap = unarchived as? ARWorldMap {
             let unmanaged = Unmanaged.passRetained(worldMap)
             let ptr = unmanaged.toOpaque()
             worldMapReceived(ptr)
             unmanaged.release()
         }
-        else if let unarchived = try? NSKeyedUnarchiver.unarchivedObject(of: ARAnchor.classForKeyedUnarchiver(), from: data),
+        else if let unarchived = try? NSKeyedUnarchiver.unarchivedObject(ofClasses: [ARAnchor.classForKeyedUnarchiver()], from: data),
             let anchor = unarchived as? ARAnchor {
             let unmanaged = Unmanaged.passRetained(anchor)
             let ptr = unmanaged.toOpaque()
