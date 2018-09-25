@@ -20,7 +20,8 @@ class UnityMCSession: NSObject {
     
     private var worldMapReceived: UNITY_MC_WORLD_MAP_CALLBACK!
     private var anchorReceived: UNITY_MC_ANCHOR_CALLBACK!
-
+    private var stateChanged: UNITY_MC_STATE_CALLBACK!
+    
     override init() {
         super.init()
         
@@ -51,29 +52,41 @@ class UnityMCSession: NSObject {
         }
     }
     
-    func setCallbacks(_ worldMapReceived: @escaping UNITY_MC_WORLD_MAP_CALLBACK, anchorReceived: @escaping UNITY_MC_ANCHOR_CALLBACK) {
+    func setCallbacks(_ worldMapReceived: @escaping UNITY_MC_WORLD_MAP_CALLBACK, anchorReceived: @escaping UNITY_MC_ANCHOR_CALLBACK, stateChanged: @escaping UNITY_MC_STATE_CALLBACK) {
         self.worldMapReceived = worldMapReceived
         self.anchorReceived = anchorReceived
+        self.stateChanged = stateChanged
     }
-
+    
     func receivedDataHandler(_ data: Data, from peer: MCPeerID) {
         
         if let unarchived = try? NSKeyedUnarchiver.unarchivedObject(ofClasses: [ARWorldMap.classForKeyedUnarchiver()], from: data),
             let worldMap = unarchived as? ARWorldMap {
             let unmanaged = Unmanaged.passRetained(worldMap)
             let ptr = unmanaged.toOpaque()
-            worldMapReceived(ptr)
-            unmanaged.release()
+            DispatchQueue.main.async {
+                self.worldMapReceived(ptr)
+                unmanaged.release()
+            }
         }
         else if let unarchived = try? NSKeyedUnarchiver.unarchivedObject(ofClasses: [ARAnchor.classForKeyedUnarchiver()], from: data),
             let anchor = unarchived as? ARAnchor {
             let unmanaged = Unmanaged.passRetained(anchor)
             let ptr = unmanaged.toOpaque()
-            anchorReceived(ptr)
-            unmanaged.release()
+            DispatchQueue.main.async {
+                self.anchorReceived(ptr)
+                unmanaged.release()
+            }
         }
         else {
             print("unknown data recieved from \(peer)")
+        }
+    }
+    
+    func stateChangedHandler(_ peerID: MCPeerID, didChange state: MCSessionState)
+    {
+        DispatchQueue.main.async {
+            self.stateChanged(peerID.toUnity(), state.toUnity())
         }
     }
     
@@ -85,7 +98,7 @@ class UnityMCSession: NSObject {
 extension UnityMCSession: MCSessionDelegate {
     
     public func session(_ session: MCSession, peer peerID: MCPeerID, didChange state: MCSessionState) {
-        // not used
+        stateChangedHandler(peerID, didChange: state)
     }
     
     public func session(_ session: MCSession, didReceive data: Data, fromPeer peerID: MCPeerID) {
