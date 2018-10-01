@@ -436,7 +436,10 @@ namespace UnityEngine.XR.iOS
         private static extern UnityARHitTestResult GetLastHitTestResult(int index);
 
         [DllImport("__Internal")]
-        private static extern ARTextureHandles GetVideoTextureHandles();
+        private static extern ARTextureHandles.ARTextureHandlesStruct GetVideoTextureHandles();
+
+        [DllImport("__Internal")]
+        public static extern void ReleaseVideoTextureHandles(ARTextureHandles.ARTextureHandlesStruct handles);
 
         [DllImport("__Internal")]
         private static extern float GetAmbientIntensity();
@@ -466,6 +469,9 @@ namespace UnityEngine.XR.iOS
         private static extern bool Native_IsARKit_1_5_Supported();
 
         [DllImport("__Internal")]
+        private static extern bool Native_IsARKit_2_0_Supported();
+
+        [DllImport("__Internal")]
         private static extern void session_GetCurrentWorldMap(IntPtr nativeSession, IntPtr callbackPtr);
 
 		[DllImport("__Internal")]
@@ -488,6 +494,15 @@ namespace UnityEngine.XR.iOS
         {
 #if !UNITY_EDITOR && UNITY_IOS
             return Native_IsARKit_1_5_Supported();
+#else
+            return true;  //since we might need to do some editor shenanigans
+#endif
+        }
+
+        public static bool IsARKit_2_0_Supported()
+        {
+#if !UNITY_EDITOR && UNITY_IOS
+            return Native_IsARKit_2_0_Supported();
 #else
             return true;  //since we might need to do some editor shenanigans
 #endif
@@ -1096,7 +1111,11 @@ namespace UnityEngine.XR.iOS
 #if !UNITY_EDITOR && UNITY_IOS
         public ARTextureHandles GetARVideoTextureHandles()
         {
-            return GetVideoTextureHandles ();
+#if !UNITY_EDITOR && UNITY_IOS
+            return new ARTextureHandles(GetVideoTextureHandles());
+#else
+            return new ARTextureHandles(new ARTextureHandles.ARTextureHandlesStruct { textureY = IntPtr.Zero, textureCbCr = IntPtr.Zero });
+#endif
         }
 
         [Obsolete("Hook ARFrameUpdatedEvent instead and get UnityARCamera.ambientIntensity")]

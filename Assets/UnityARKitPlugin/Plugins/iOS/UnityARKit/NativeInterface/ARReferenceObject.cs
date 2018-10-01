@@ -189,6 +189,8 @@ namespace UnityEngine.XR.iOS
 
 		public IntPtr CreateNativeReferenceObjectsSet(List<ARReferenceObject> refObjects)
 		{
+			if (IsARKit_2_0_Supported() == false) return IntPtr.Zero;
+			
 			IntPtr refObjectsSet = referenceObjectsSet_Create ();
 			foreach (ARReferenceObject arro in refObjects) 
 			{

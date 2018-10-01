@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using System.Collections;
 using System.Runtime.InteropServices;
 using System;
@@ -94,7 +94,9 @@ namespace UnityEngine.XR.iOS
 		public UnityARMatrix4x4 leftEyeTransform;
 		public UnityARMatrix4x4 rightEyeTransform;
 		public Vector3 lookAtPoint;
+		public bool isTracked;   //this is from the new ARTrackable protocol that ARFaceAnchor now subscribes to
 	}
+		
 
 	#if !UNITY_EDITOR && UNITY_IOS
 	public class ARFaceGeometry
@@ -207,8 +209,10 @@ namespace UnityEngine.XR.iOS
 
 		public string identifierStr { get { return faceAnchorData.identifierStr; } }
 
-		public Matrix4x4 transform {
-			get {
+		public bool isTracked { get { return faceAnchorData.isTracked; } }
+
+		public Matrix4x4 transform { 
+			get { 
 				Matrix4x4 matrix = new Matrix4x4 ();
 				matrix.SetColumn (0, faceAnchorData.transform.column0);
 				matrix.SetColumn (1, faceAnchorData.transform.column1);
