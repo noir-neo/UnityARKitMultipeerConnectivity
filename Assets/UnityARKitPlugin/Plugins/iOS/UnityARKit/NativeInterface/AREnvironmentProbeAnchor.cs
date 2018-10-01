@@ -14,8 +14,28 @@ namespace UnityEngine.XR.iOS
 		UnityAREnvironmentTexturingNone,
 		UnityAREnvironmentTexturingManual,
 		UnityAREnvironmentTexturingAutomatic
-	}
+	};
 
+   public enum UnityAREnvironmentTextureFormat : long
+   {
+       // NOTE: Not a complete set, but an initial mapping that matches an internal set of texture readback mappings.
+       UnityAREnvironmentTextureFormatR16,
+       UnityAREnvironmentTextureFormatRG16,
+       UnityAREnvironmentTextureFormatBGRA32,
+       UnityAREnvironmentTextureFormatRGBA32,
+       UnityAREnvironmentTextureFormatRGBAFloat,
+       UnityAREnvironmentTextureFormatRGBAHalf,
+       UnityAREnvironmentTextureFormatDefault = UnityAREnvironmentTextureFormatBGRA32
+   };
+
+   public struct UnityAREnvironmentProbeCubemapData
+   {
+       public IntPtr cubemapPtr;
+       public UnityAREnvironmentTextureFormat textureFormat;
+       public int width;
+       public int height;
+       public int mipmapCount;
+   };
 
 	public struct UnityAREnvironmentProbeAnchorData 
 	{
@@ -27,12 +47,34 @@ namespace UnityEngine.XR.iOS
 			 */
 		public UnityARMatrix4x4 transform;
 
-		public IntPtr cubemapPtr;
+		public UnityAREnvironmentProbeCubemapData cubemapData;
 
 		public Vector3 probeExtent;
 
 	};
 
+    public static class UnityAREnvironmentProbeCubemapDataMethods
+    {
+        public static TextureFormat GetTextureFormat(this UnityAREnvironmentTextureFormat unityAREnvironmentTextureFormat)
+        {
+            switch (unityAREnvironmentTextureFormat)
+            {
+                case UnityAREnvironmentTextureFormat.UnityAREnvironmentTextureFormatR16:
+                    return TextureFormat.R16;
+                case UnityAREnvironmentTextureFormat.UnityAREnvironmentTextureFormatRG16:
+                    return TextureFormat.RG16;
+                case UnityAREnvironmentTextureFormat.UnityAREnvironmentTextureFormatRGBA32:
+                    return TextureFormat.RGBA32;
+                case UnityAREnvironmentTextureFormat.UnityAREnvironmentTextureFormatRGBAFloat:
+                    return TextureFormat.RGBAFloat;
+                case UnityAREnvironmentTextureFormat.UnityAREnvironmentTextureFormatRGBAHalf:
+                    return TextureFormat.RGBAHalf;
+                case UnityAREnvironmentTextureFormat.UnityAREnvironmentTextureFormatBGRA32:
+                default:
+                    return TextureFormat.BGRA32;
+            }
+        }
+    }
 
 	public class AREnvironmentProbeAnchor 
 	{
@@ -61,8 +103,13 @@ namespace UnityEngine.XR.iOS
 		{
 			get 
 			{ 
-				if (envProbeAnchorData.cubemapPtr != IntPtr.Zero) {
-					return Cubemap.CreateExternalTexture (0, TextureFormat.R8, false, envProbeAnchorData.cubemapPtr);
+                if (envProbeAnchorData.cubemapData.cubemapPtr != IntPtr.Zero) {
+                    Cubemap cubemap = Cubemap.CreateExternalTexture(envProbeAnchorData.cubemapData.width,
+                                                                    envProbeAnchorData.cubemapData.textureFormat.GetTextureFormat(),
+                                                                    (envProbeAnchorData.cubemapData.mipmapCount > 1),
+                                                                    envProbeAnchorData.cubemapData.cubemapPtr);
+                    cubemap.filterMode = FilterMode.Trilinear;
+                    return cubemap;
 				} else {
 					return null;
 				}

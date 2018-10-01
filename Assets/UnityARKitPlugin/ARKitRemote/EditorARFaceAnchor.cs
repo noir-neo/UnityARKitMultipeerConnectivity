@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System.Text;
@@ -69,6 +69,8 @@ namespace UnityEngine.XR.iOS
 				return Vector3.zero;
 			}
 		}
+
+		public bool isTracked { get { return m_sfa.isTracked; } }
 
 
 	}

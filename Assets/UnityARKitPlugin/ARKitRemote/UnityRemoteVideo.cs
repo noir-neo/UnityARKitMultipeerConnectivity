@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -88,7 +88,7 @@ namespace UnityEngine.XR.iOS
 		public void OnPreRender()
 		{
 			ARTextureHandles handles = m_Session.GetARVideoTextureHandles();
-			if (handles.textureY == System.IntPtr.Zero || handles.textureCbCr == System.IntPtr.Zero)
+            if (handles.IsNull())
 			{
 				return;
 			}

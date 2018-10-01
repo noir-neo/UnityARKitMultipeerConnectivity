@@ -3,6 +3,12 @@
 #import "unityswift-Swift.h"
 #import "ARKitDefines.h"
 
+inline void UnityARUserAnchorDataFromARAnchorPtr(UnityARUserAnchorData& anchorData, ARAnchor* nativeAnchor)
+{
+    anchorData.identifier = (void*)[nativeAnchor.identifier.UUIDString UTF8String];
+    ARKitMatrixToUnityARMatrix4x4(nativeAnchor.transform, &anchorData.transform);
+}
+
 extern "C" {
     void* _createNativeMCSession() {
         UnityMCSession* session = [[UnityMCSession alloc] init];

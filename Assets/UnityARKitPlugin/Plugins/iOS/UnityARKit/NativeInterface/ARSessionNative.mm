@@ -8,8 +8,8 @@
 #include "ARKitDefines.h"
 
 // These don't all need to be static data, but no other better place for them at the moment.
-static id <MTLTexture> s_CapturedImageTextureY;
-static id <MTLTexture> s_CapturedImageTextureCbCr;
+static id <MTLTexture> s_CapturedImageTextureY = NULL;
+static id <MTLTexture> s_CapturedImageTextureCbCr = NULL;
 static UnityARMatrix4x4 s_CameraProjectionMatrix;
 
 static float s_AmbientIntensity;
@@ -200,6 +200,13 @@ inline void UnityARMatrix4x4FromCGAffineTransform(UnityARMatrix4x4& outMatrix, C
     }
 }
 
+inline void UnityARUserAnchorDataFromARAnchorPtr(UnityARUserAnchorData& anchorData, ARAnchor* nativeAnchor)
+{
+    anchorData.identifier = (void*)[nativeAnchor.identifier.UUIDString UTF8String];
+    ARKitMatrixToUnityARMatrix4x4(nativeAnchor.transform, &anchorData.transform);
+}
+
+
 #if ARKIT_USES_FACETRACKING
 inline void UnityARFaceGeometryFromARFaceGeometry(UnityARFaceGeometry& faceGeometry, ARFaceGeometry *arFaceGeometry)
 {
@@ -224,6 +231,7 @@ inline void UnityARFaceAnchorDataFromARFaceAnchorPtr(UnityARFaceAnchorData& anch
 
     UnityARFaceGeometryFromARFaceGeometry(anchorData.faceGeometry, nativeAnchor.geometry);
     anchorData.blendShapes = (__bridge void *) nativeAnchor.blendShapes;
+    anchorData.isTracked = (uint32_t) nativeAnchor.isTracked;
 }
 #endif
 
@@ -418,6 +426,7 @@ static UnityPixelBuffer s_UnityPixelBuffers;
 {
     if (self = [super init])
     {
+        _textureCache = NULL;
         _classToCallbackMap = [[NSMutableDictionary alloc] init];
     }
     return self;
@@ -425,14 +434,19 @@ static UnityPixelBuffer s_UnityPixelBuffers;
 
 - (void)setupMetal
 {
+    if (_textureCache != NULL)
+    {
+        return;
+    }
     _device = MTLCreateSystemDefaultDevice();
     CVMetalTextureCacheCreate(NULL, NULL, _device, NULL, &_textureCache);
 }
 
 - (void)teardownMetal
 {
-    if (_textureCache) {
+    if (_textureCache != NULL) {
         CFRelease(_textureCache);
+        _textureCache = NULL;
     }
 }
 
@@ -571,6 +585,9 @@ static CGAffineTransform s_CurAffineTransform;
         if(status == kCVReturnSuccess)
         {
             textureY = CVMetalTextureGetTexture(texture);
+        }
+        if (texture != NULL)
+        {
             CFRelease(texture);
         }
     }
@@ -586,6 +603,9 @@ static CGAffineTransform s_CurAffineTransform;
         if(status == kCVReturnSuccess)
         {
             textureCbCr = CVMetalTextureGetTexture(texture);
+        }
+        if (texture != NULL)
+        {
             CFRelease(texture);
         }
     }
@@ -887,6 +907,7 @@ extern "C" void PauseSession(void* nativeSession)
 {
     UnityARSession* session = (__bridge UnityARSession*)nativeSession;
     [session->_session pause];
+    [session teardownMetal];
 }
 
 extern "C" void StopSession(void* nativeSession)
@@ -1021,6 +1042,18 @@ extern "C" UnityARTextureHandles GetVideoTextureHandles()
     return handles;
 }
 
+extern "C" void ReleaseVideoTextureHandles(UnityARTextureHandles handles)
+{
+    if (handles.textureY != NULL)
+    {
+        CFRelease(handles.textureY);
+    }
+    if (handles.textureCbCr != NULL)
+    {
+        CFRelease(handles.textureCbCr);
+    }
+}
+
 extern "C" bool GetARPointCloud(float** verts, unsigned int* vertLength)
 {
     *verts = (float*)s_PointCloud;
@@ -1072,6 +1105,11 @@ extern "C" void EnumerateVideoFormats(UNITY_AR_VIDEOFORMAT_CALLBACK videoFormatC
 extern "C" bool Native_IsARKit_1_5_Supported()
 {
     return UnityIsARKit_1_5_Supported();
+}
+
+extern "C" bool Native_IsARKit_2_0_Supported()
+{
+    return UnityIsARKit_2_0_Supported();
 }
 
 extern "C" bool IsARKitFaceTrackingConfigurationSupported()

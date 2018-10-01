@@ -61,17 +61,18 @@ namespace UnityEngine.XR.iOS
 			else 
 			{
 				// Load the results into a managed array.
-				float [] resultVertices = new float[pointCount];
-				Marshal.Copy(pointsPtr, resultVertices, 0, pointCount);
+				var floatCount = pointCount * 4;
+				float [] resultVertices = new float[floatCount];
+				Marshal.Copy(pointsPtr, resultVertices, 0, floatCount);
 
-				Vector3[] verts = new Vector3[(pointCount / 4)];
+				Vector3[] verts = new Vector3[pointCount];
 
 				for (int count = 0; count < pointCount; count++)
 				{
 					//convert to Unity coords system
-					verts[count / 4].x = resultVertices[count++];
-					verts[count / 4].y = resultVertices[count++];
-					verts[count / 4].z = -resultVertices[count++];
+					verts[count].x = resultVertices[count * 4];
+					verts[count].y = resultVertices[count * 4 + 1];
+					verts[count].z = -resultVertices[count * 4 + 2];
 				}
 
 				return verts;

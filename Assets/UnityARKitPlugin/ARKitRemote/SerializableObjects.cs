@@ -532,13 +532,15 @@ namespace UnityEngine.XR.iOS.Utils
 		public serializableFaceGeometry faceGeometry;
 		public Dictionary<string, float> arBlendShapes;
 		public byte[] identifierStr;
+		public bool isTracked;
 
-		public serializableUnityARFaceAnchor( serializableUnityARMatrix4x4 wt, serializableFaceGeometry fg, Dictionary<string, float> bs, byte [] idstr)
+		public serializableUnityARFaceAnchor( serializableUnityARMatrix4x4 wt, serializableFaceGeometry fg, Dictionary<string, float> bs, byte [] idstr, bool bIsTracked)
 		{
 			worldTransform = wt;
 			faceGeometry = fg;
 			arBlendShapes = bs;
 			identifierStr = idstr;
+			isTracked = bIsTracked;
 		}
 
 
@@ -553,7 +555,7 @@ namespace UnityEngine.XR.iOS.Utils
 			serializableUnityARMatrix4x4 wt = rValue.transform;
 			serializableFaceGeometry sfg = rValue.faceGeometry;
 			byte[] idstr = Encoding.UTF8.GetBytes (rValue.identifierStr);
-			return new serializableUnityARFaceAnchor(wt, sfg, rValue.blendShapes, idstr);
+			return new serializableUnityARFaceAnchor(wt, sfg, rValue.blendShapes, idstr, rValue.isTracked);
 		}
 		#endif
 	};

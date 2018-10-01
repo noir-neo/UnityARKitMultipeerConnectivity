@@ -14,6 +14,11 @@ public class ARReferenceObjectsSetAsset : ScriptableObject {
 	{
 		List<ARReferenceObject> listRefObjects = new List<ARReferenceObject> ();
 
+		if (UnityARSessionNativeInterface.IsARKit_2_0_Supported() == false)
+		{
+			return listRefObjects;
+		}
+
 		string folderPath = Application.streamingAssetsPath + "/ARReferenceObjects/" + resourceGroupName + ".arresourcegroup";
 		string contentsJsonPath = Path.Combine(folderPath, "Contents.json");
 
