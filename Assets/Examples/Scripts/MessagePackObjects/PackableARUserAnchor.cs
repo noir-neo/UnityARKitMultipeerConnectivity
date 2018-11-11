@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.XR.iOS;
 
 [MessagePackObject]
-public struct PackableARUserAnchor
+public struct PackableARUserAnchor : IMessagePackUnion
 {
     [Key(0)]
     public readonly string Identifier;

@@ -2,7 +2,7 @@
 using UnityEngine.XR.iOS;
 
 [MessagePackObject]
-public struct PackableARWorldMap
+public struct PackableARWorldMap : IMessagePackUnion
 {
     [Key(0)]
     public readonly byte[] ARWorldMapData;
