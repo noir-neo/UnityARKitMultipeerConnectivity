@@ -1,9 +1,6 @@
 ﻿using System;
-using AOT;
-using UnityEngine.XR.iOS;
-#if !UNITY_EDITOR && UNITY_IOS
 using System.Runtime.InteropServices;
-#endif
+using AOT;
 
 namespace UnityMultipeerConnectivity
 {
@@ -15,13 +12,9 @@ namespace UnityMultipeerConnectivity
             return mcSessionNativeInterface ?? (mcSessionNativeInterface = new UnityMCSessionNativeInterface());
         }
 
-        public event Action<ARWorldMap> WorldMapReceivedEvent;
-        static event Action<ARWorldMap> WorldMapReceivedEventInternal;
-        delegate void internal_WorldMapReceived(IntPtr worldMapPtr);
-
-        public event Action<UnityARUserAnchorData> AnchorReceivedEvent;
-        static event Action<UnityARUserAnchorData> AnchorReceivedInternal;
-        delegate void internal_AnchorReceived(IntPtr anchorPtr);
+        public event Action<byte[]> DataReceivedEvent;
+        static event Action<byte[]> DataReceivedInternal;
+        delegate void internal_DataReceived(IntPtr arrPtr, int length);
 
         public event Action<UnityMCPeerID, UnityMCSessionState> StateChangedEvent;
         static event Action<UnityMCPeerID, UnityMCSessionState> StateChangedInternal;
@@ -33,19 +26,17 @@ namespace UnityMultipeerConnectivity
 
         UnityMCSessionNativeInterface()
         {
-            WorldMapReceivedEventInternal += WorldMapReceived;
-            AnchorReceivedInternal += AnchorReceived;
+            DataReceivedInternal += DataReceived;
             StateChangedInternal += StateChanged;
 #if !UNITY_EDITOR && UNITY_IOS
             nativeMCSession = _createNativeMCSession();
-            _setCallbacks(nativeMCSession, _world_map_received, _anchor_received, _state_changed);
+            _setCallbacks(nativeMCSession, _data_received, _state_changed);
 #endif
         }
 
         public void Dispose()
         {
-            WorldMapReceivedEventInternal -= WorldMapReceived;
-            AnchorReceivedInternal -= AnchorReceived;
+            DataReceivedInternal -= DataReceived;
             StateChangedInternal -= StateChanged;
         }
 
@@ -54,54 +45,25 @@ namespace UnityMultipeerConnectivity
         static extern IntPtr _createNativeMCSession();
 
         [DllImport("__Internal")]
-        static extern void _setCallbacks(IntPtr nativeSession, internal_WorldMapReceived worldMapReceivedCallback, internal_AnchorReceived anchorReceivedCallback,  internal_StateChanged stateChangedCallback);
+        static extern void _setCallbacks(IntPtr nativeSession, internal_DataReceived dataReceivedCallback, internal_StateChanged stateChangedCallback);
 
         [DllImport("__Internal")]
-        static extern void _sendARWorldMapToAllPeers(IntPtr nativeSession, IntPtr dataPtr);
-
-        [DllImport("__Internal")]
-        static extern void _sendARAnchorToAllPeers(IntPtr nativeSession, UnityARUserAnchorData anchorData);
-
-        [DllImport("__Internal")]
-        static extern UnityARUserAnchorData _unityARUserAnchorDataFromARAnchorPtr(IntPtr anchorPtr);
+        static extern void _sendToAllPeers(IntPtr nativeSession, byte[] array, int length);
 #endif
 
-        public void SendToAllPeers(IntPtr dataPtr)
+        public void SendToAllPeers(byte[] data)
         {
 #if !UNITY_EDITOR && UNITY_IOS
-            _sendARWorldMapToAllPeers(nativeMCSession, dataPtr);
+            _sendToAllPeers(nativeMCSession, data, data.Length);
 #endif
         }
 
-        public void SendToAllPeers(UnityARUserAnchorData anchorData)
+        [MonoPInvokeCallback(typeof(internal_DataReceived))]
+        static void _data_received(IntPtr arrPtr, int length)
         {
-#if !UNITY_EDITOR && UNITY_IOS
-            _sendARAnchorToAllPeers(nativeMCSession, anchorData);
-#endif
-        }
-
-        static UnityARUserAnchorData UnityARUserAnchorDataFromARAnchorPtr(IntPtr anchorPtr)
-        {
-#if !UNITY_EDITOR && UNITY_IOS
-            return _unityARUserAnchorDataFromARAnchorPtr(anchorPtr);
-#else
-            return new UnityARUserAnchorData();
-#endif
-        }
-
-        [MonoPInvokeCallback(typeof(internal_WorldMapReceived))]
-        static void _world_map_received(IntPtr worldMapPtr)
-        {
-            if (WorldMapReceivedEventInternal == null) return;
-            var worldMap = ARWorldMap.FromPtr(worldMapPtr);
-            WorldMapReceivedEventInternal(worldMap);
-        }
-
-        [MonoPInvokeCallback(typeof(internal_AnchorReceived))]
-        static void _anchor_received(IntPtr anchorPtr)
-        {
-            var anchorData = UnityARUserAnchorDataFromARAnchorPtr(anchorPtr);
-            AnchorReceivedInternal?.Invoke(anchorData);
+            var array = new byte[length];
+            Marshal.Copy(arrPtr, array, 0, length);
+            DataReceivedInternal?.Invoke(array);
         }
 
         [MonoPInvokeCallback(typeof(internal_StateChanged))]
@@ -110,14 +72,9 @@ namespace UnityMultipeerConnectivity
             StateChangedInternal?.Invoke(peerId, sessionState);
         }
 
-        void WorldMapReceived(ARWorldMap worldMap)
+        void DataReceived(byte[] data)
         {
-            WorldMapReceivedEvent?.Invoke(worldMap);
-        }
-
-        void AnchorReceived(UnityARUserAnchorData anchorData)
-        {
-            AnchorReceivedEvent?.Invoke(anchorData);
+            DataReceivedEvent?.Invoke(data);
         }
 
         void StateChanged(UnityMCPeerID peerId, UnityMCSessionState sessionState)

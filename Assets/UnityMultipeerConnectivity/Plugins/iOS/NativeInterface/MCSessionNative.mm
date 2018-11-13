@@ -3,46 +3,22 @@
 #import "unityswift-Swift.h"
 #import "ARKitDefines.h"
 
-inline void UnityARUserAnchorDataFromARAnchorPtr(UnityARUserAnchorData& anchorData, ARAnchor* nativeAnchor)
-{
-    anchorData.identifier = (void*)[nativeAnchor.identifier.UUIDString UTF8String];
-    ARKitMatrixToUnityARMatrix4x4(nativeAnchor.transform, &anchorData.transform);
-}
-
 extern "C" {
     void* _createNativeMCSession() {
         UnityMCSession* session = [[UnityMCSession alloc] init];
         return (__bridge_retained void*)session;
     }
 
-    void _sendARWorldMapToAllPeers(const void* nativeSession, const void* worldMapPtr) {
-        if (worldMapPtr == nullptr)
-            return;
+    void _sendToAllPeers(const void* nativeSession, const char** arr, const int length) {
         UnityMCSession* session = (__bridge UnityMCSession*)nativeSession;
-        ARWorldMap* worldMap = (__bridge ARWorldMap*)worldMapPtr;
-        [session sendToAllPeers:(ARWorldMap*) worldMap];
+        NSData* data = [NSData dataWithBytes:(const void *)arr length:(sizeof(unsigned char) * length)];
+        [session sendToAllPeers:(NSData*) data];
     }
-    
-    void _sendARAnchorToAllPeers(const void* nativeSession, UnityARUserAnchorData anchorData) {
+
+    void _setCallbacks(const void* nativeSession, UNITY_MC_ARRAY_CALLBACK dataReceived, UNITY_MC_STATE_CALLBACK stateChanged) {
         UnityMCSession* session = (__bridge UnityMCSession*)nativeSession;
-        matrix_float4x4 matrix;
-        UnityARMatrix4x4ToARKitMatrix(anchorData.transform, &matrix);
-        ARAnchor *anchor = [[ARAnchor alloc] initWithTransform:matrix];
-        [session sendToAllPeers:(ARAnchor*) anchor];
-    }
-    
-    void _setCallbacks(const void* nativeSession, UNITY_MC_WORLD_MAP_CALLBACK worldMapReceived, UNITY_MC_ANCHOR_CALLBACK anchorReceived, UNITY_MC_STATE_CALLBACK stateChanged) {
-        UnityMCSession* session = (__bridge UnityMCSession*)nativeSession;
-        [session setCallbacks:(UNITY_MC_WORLD_MAP_CALLBACK) worldMapReceived
-            anchorReceived:(UNITY_MC_ANCHOR_CALLBACK) anchorReceived
+        [session setCallbacks:(UNITY_MC_ARRAY_CALLBACK) dataReceived
             stateChanged:(UNITY_MC_STATE_CALLBACK) stateChanged
             ];
-    }
-    
-    UnityARUserAnchorData _unityARUserAnchorDataFromARAnchorPtr(const void* anchorPtr) {
-        ARAnchor* anchor = (__bridge ARAnchor*)anchorPtr;
-        UnityARUserAnchorData anchorData;
-        UnityARUserAnchorDataFromARAnchorPtr(anchorData, anchor);
-        return anchorData;
     }
 }
