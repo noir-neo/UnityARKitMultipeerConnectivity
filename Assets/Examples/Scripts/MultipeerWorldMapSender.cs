@@ -12,7 +12,6 @@ public class MultipeerWorldMapSender : MonoBehaviour
 
     void Start()
     {
-
         sendWorldMapButton.OnClickAsObservable()
             .Subscribe(async _ => await SendCurrentARWorldMapToAllPeersAsync())
             .AddTo(this);
@@ -22,8 +21,7 @@ public class MultipeerWorldMapSender : MonoBehaviour
     {
         var arSessionNativeInterface = UnityARSessionNativeInterface.GetARSessionNativeInterface();
         var arWorldMap = await arSessionNativeInterface.GetCurrentWorldMapAsnyc();
-        var nativePtr = arWorldMap.nativePtr;
-        var mcSessionNativeInterface = UnityMCSessionNativeInterface.GetMcSessionNativeInterface();
-        mcSessionNativeInterface.SendToAllPeers(nativePtr);
+
+        UnityMCSessionNativeInterface.GetMcSessionNativeInterface().SendToAllPeers((PackableARWorldMap)arWorldMap);
     }
 }

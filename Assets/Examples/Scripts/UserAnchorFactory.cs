@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Generic;
 using UniRx;
 using UnityEngine;
 using UnityEngine.XR.iOS;
@@ -27,7 +25,8 @@ public class UserAnchorFactory : MonoBehaviour
     static IObservable<UnityARUserAnchorData> AnchorReceivedAsObservable()
     {
         return UnityMCSessionNativeInterface.GetMcSessionNativeInterface()
-            .AnchorReceivedAsObservable();
+            .DataReceivedAsObservable<PackableARUserAnchor>()
+            .Select(x => (UnityARUserAnchorData)x);
     }
 
     static void AddAnchor(UnityARUserAnchorData anchorData)

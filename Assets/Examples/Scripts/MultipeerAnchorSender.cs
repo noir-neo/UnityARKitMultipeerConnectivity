@@ -1,6 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UniRx;
+﻿using UniRx;
 using UnityEngine;
 using UnityEngine.XR.iOS;
 using UnityMultipeerConnectivity;
@@ -20,6 +18,6 @@ public class MultipeerAnchorSender : MonoBehaviour
     static void SendAnchorToAllPeers(UnityARUserAnchorData anchorData)
     {
         UnityMCSessionNativeInterface.GetMcSessionNativeInterface()
-            .SendToAllPeers(anchorData);
+            .SendToAllPeers((PackableARUserAnchor)anchorData);
     }
 }
