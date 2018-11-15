@@ -11,7 +11,8 @@ public class MultipeerWorldMapReceiver : MonoBehaviour
     void Start()
     {
         UnityMCSessionNativeInterface.GetMcSessionNativeInterface()
-            .WorldMapReceivedAsObservable()
+            .DataReceivedAsObservable<PackableARWorldMap>()
+            .Select(x => (ARWorldMap)x)
             .Subscribe(RestartARSessionWith)
             .AddTo(this);
     }

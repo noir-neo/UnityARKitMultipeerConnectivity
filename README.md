@@ -22,7 +22,7 @@ public static class ARWorldMapSender
         var arSession = UnityARSessionNativeInterface.GetARSessionNativeInterface();
 
         arSession.GetCurrentWorldMapAsync(worldMap => {
-            mcSession.SendToAllPeers(worldMap.nativePtr);
+            mcSession.SendToAllPeers(worldMap.SerializeToByteArray());
         });
     }
 }
@@ -37,11 +37,12 @@ public class ARWorldMapReceiver : MonoBehaviour
 
     void Start()
     {
-        UnityMCSessionNativeInterface.GetMcSessionNativeInterface().WorldMapReceivedEvent += Relocalize;
+        UnityMCSessionNativeInterface.GetMcSessionNativeInterface().DataReceivedEvent += OnDataReceived;
     }
 
-    void Relocalize(ARWorldMap worldMap)
+    void OnDataReceived(byte[] data)
     {
+        var worldMap = ARWorldMap.SerializeFromByteArray(data);
         UnityARSessionNativeInterface.ARSessionShouldAttemptRelocalization = true;
         var config = arCameraManager.sessionConfiguration;
         config.worldMap = worldMap;
@@ -57,6 +58,11 @@ public class ARWorldMapReceiver : MonoBehaviour
 ### And more
 
 See [Examples](https://github.com/noir-neo/UnityARKitMultipeerConnectivity/tree/master/Assets/Examples).
+
+Using [neuecc/MessagePack-CSharp](https://github.com/neuecc/MessagePack-CSharp) as serializer in this example.
+If you want to add or modify MessagePackObject, you need pre-code generation on Unity iOS. On macOS, this [issue comment](https://github.com/neuecc/MessagePack-CSharp/pull/155#issuecomment-354580450) is very useful.
+
+Generated code path is `Assets/Scripts/Generated/MessagePackGenerated.cs`
 
 ## Requirements
 

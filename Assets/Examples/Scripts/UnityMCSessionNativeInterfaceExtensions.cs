@@ -1,26 +1,32 @@
 ﻿using System;
+using MessagePack;
 using UniRx;
-using UnityEngine.XR.iOS;
 
 namespace UnityMultipeerConnectivity
 {
     public static class UnityMCSessionNativeInterfaceExtensions
     {
-        public static IObservable<ARWorldMap> WorldMapReceivedAsObservable(this UnityMCSessionNativeInterface mcSessionNativeInterface)
+        public static void SendToAllPeers<T>(this UnityMCSessionNativeInterface mcSessionNativeInterface, T data)
+            where T : IMessagePackUnion
         {
-            return Observable.FromEvent<ARWorldMap>(
-                h => mcSessionNativeInterface.WorldMapReceivedEvent += h,
-                h => mcSessionNativeInterface.WorldMapReceivedEvent -= h
-            );
+            var bin = MessagePackSerializer.Serialize<IMessagePackUnion>(data);
+            mcSessionNativeInterface.SendToAllPeers(bin);
         }
 
-        public static IObservable<UnityARUserAnchorData> AnchorReceivedAsObservable(
-            this UnityMCSessionNativeInterface mcSessionNativeInterface)
+        public static IObservable<T> DataReceivedAsObservable<T>(this UnityMCSessionNativeInterface mcSessionNativeInterface)
+            where T : IMessagePackUnion
         {
-            return Observable.FromEvent<UnityARUserAnchorData>(
-                h => mcSessionNativeInterface.AnchorReceivedEvent += h,
-                h => mcSessionNativeInterface.AnchorReceivedEvent -= h
-            );
+            return mcSessionNativeInterface.DataReceivedAsObservable()
+                .Select(MessagePackSerializer.Deserialize<IMessagePackUnion>)
+                .OfType<IMessagePackUnion, T>();
+        }
+
+        public static IObservable<byte[]> DataReceivedAsObservable(this UnityMCSessionNativeInterface mcSessionNativeInterface)
+        {
+            return Observable.FromEvent<byte[]>(
+                h => mcSessionNativeInterface.DataReceivedEvent += h,
+                h => mcSessionNativeInterface.DataReceivedEvent -= h
+                );
         }
 
         public static IObservable<Tuple<UnityMCPeerID, UnityMCSessionState>> StateChangedAsObservable(

@@ -18,8 +18,7 @@ class UnityMCSession: NSObject {
     private var serviceAdvertiser: MCNearbyServiceAdvertiser!
     private var serviceBrowser: MCNearbyServiceBrowser!
     
-    private var worldMapReceived: UNITY_MC_WORLD_MAP_CALLBACK!
-    private var anchorReceived: UNITY_MC_ANCHOR_CALLBACK!
+    private var dataReceived: UNITY_MC_ARRAY_CALLBACK!
     private var stateChanged: UNITY_MC_STATE_CALLBACK!
     
     override init() {
@@ -36,15 +35,8 @@ class UnityMCSession: NSObject {
         serviceBrowser.delegate = self
         serviceBrowser.startBrowsingForPeers()
     }
-
-    func sendToAllPeers(_ object: Any) {
-        
-        guard let data = try? NSKeyedArchiver.archivedData(withRootObject: object, requiringSecureCoding: true)
-            else { fatalError("can't encode object") }
-        self.sendToAllPeers(data)
-    }
-
-    private func sendToAllPeers(_ data: Data) {
+    
+    func sendToAllPeers(_ data: Data) {
         do {
             try session.send(data, toPeers: session.connectedPeers, with: .reliable)
         } catch {
@@ -52,34 +44,17 @@ class UnityMCSession: NSObject {
         }
     }
     
-    func setCallbacks(_ worldMapReceived: @escaping UNITY_MC_WORLD_MAP_CALLBACK, anchorReceived: @escaping UNITY_MC_ANCHOR_CALLBACK, stateChanged: @escaping UNITY_MC_STATE_CALLBACK) {
-        self.worldMapReceived = worldMapReceived
-        self.anchorReceived = anchorReceived
+    func setCallbacks(_ dataReceived: @escaping UNITY_MC_ARRAY_CALLBACK, stateChanged: @escaping UNITY_MC_STATE_CALLBACK) {
+        self.dataReceived = dataReceived
         self.stateChanged = stateChanged
     }
     
     func receivedDataHandler(_ data: Data, from peer: MCPeerID) {
-        
-        if let unarchived = try? NSKeyedUnarchiver.unarchivedObject(ofClasses: [ARWorldMap.classForKeyedUnarchiver()], from: data),
-            let worldMap = unarchived as? ARWorldMap {
-            let unmanaged = Unmanaged.passRetained(worldMap)
-            let ptr = unmanaged.toOpaque()
+        data.withUnsafeBytes { (ptr: UnsafePointer<UInt8>) in
+            let rawPtr = UnsafeMutableRawPointer(mutating: ptr)
             DispatchQueue.main.async {
-                self.worldMapReceived(ptr)
-                unmanaged.release()
+                self.dataReceived(rawPtr, CInt(data.count))
             }
-        }
-        else if let unarchived = try? NSKeyedUnarchiver.unarchivedObject(ofClasses: [ARAnchor.classForKeyedUnarchiver()], from: data),
-            let anchor = unarchived as? ARAnchor {
-            let unmanaged = Unmanaged.passRetained(anchor)
-            let ptr = unmanaged.toOpaque()
-            DispatchQueue.main.async {
-                self.anchorReceived(ptr)
-                unmanaged.release()
-            }
-        }
-        else {
-            print("unknown data recieved from \(peer)")
         }
     }
     
