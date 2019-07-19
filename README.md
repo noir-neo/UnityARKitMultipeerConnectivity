@@ -62,7 +62,7 @@ See [Examples](https://github.com/noir-neo/UnityARKitMultipeerConnectivity/tree/
 Using [neuecc/MessagePack-CSharp](https://github.com/neuecc/MessagePack-CSharp) as serializer in this example.
 If you want to add or modify MessagePackObject, you need pre-code generation on Unity iOS. For more, see https://github.com/neuecc/MessagePack-CSharp#pre-code-generationunityxamarin-supports
 
-note: Generated code path is `Assets/Scripts/Generated/MessagePackGenerated.cs`
+note: Generated code path is `Assets/Examples/Common/Scripts/Generated/MessagePackGenerated.cs`
 
 ## Requirements
 
