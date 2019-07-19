@@ -1,7 +1,6 @@
 #import <Foundation/Foundation.h>
 #import <ARKit/ARKit.h>
 #import "unityswift-Swift.h"
-#import "ARKitDefines.h"
 
 extern "C" {
     void* _createNativeMCSession() {
