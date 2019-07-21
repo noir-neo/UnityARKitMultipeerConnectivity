@@ -43,10 +43,11 @@ namespace MessagePack.Resolvers
 
         static GeneratedResolverGetFormatterHelper()
         {
-            lookup = new global::System.Collections.Generic.Dictionary<Type, int>(2)
+            lookup = new global::System.Collections.Generic.Dictionary<Type, int>(3)
             {
                 {typeof(global::IMessagePackUnion), 0 },
-                {typeof(global::PackableARWorldMap), 1 },
+                {typeof(global::PackableARCollaborationData), 1 },
+                {typeof(global::PackableARWorldMap), 2 },
             };
         }
 
@@ -58,7 +59,8 @@ namespace MessagePack.Resolvers
             switch (key)
             {
                 case 0: return new MessagePack.Formatters.IMessagePackUnionFormatter();
-                case 1: return new MessagePack.Formatters.PackableARWorldMapFormatter();
+                case 1: return new MessagePack.Formatters.PackableARCollaborationDataFormatter();
+                case 2: return new MessagePack.Formatters.PackableARWorldMapFormatter();
                 default: return null;
             }
         }
@@ -89,13 +91,15 @@ namespace MessagePack.Formatters
 
         public IMessagePackUnionFormatter()
         {
-            this.typeToKeyAndJumpMap = new Dictionary<RuntimeTypeHandle, KeyValuePair<int, int>>(1, global::MessagePack.Internal.RuntimeTypeHandleEqualityComparer.Default)
+            this.typeToKeyAndJumpMap = new Dictionary<RuntimeTypeHandle, KeyValuePair<int, int>>(2, global::MessagePack.Internal.RuntimeTypeHandleEqualityComparer.Default)
             {
                 { typeof(global::PackableARWorldMap).TypeHandle, new KeyValuePair<int, int>(0, 0) },
+                { typeof(global::PackableARCollaborationData).TypeHandle, new KeyValuePair<int, int>(1, 1) },
             };
-            this.keyToJumpMap = new Dictionary<int, int>(1)
+            this.keyToJumpMap = new Dictionary<int, int>(2)
             {
                 { 0, 0 },
+                { 1, 1 },
             };
         }
 
@@ -111,6 +115,9 @@ namespace MessagePack.Formatters
                 {
                     case 0:
                         offset += formatterResolver.GetFormatterWithVerify<global::PackableARWorldMap>().Serialize(ref bytes, offset, (global::PackableARWorldMap)value, formatterResolver);
+                        break;
+                    case 1:
+                        offset += formatterResolver.GetFormatterWithVerify<global::PackableARCollaborationData>().Serialize(ref bytes, offset, (global::PackableARCollaborationData)value, formatterResolver);
                         break;
                     default:
                         break;
@@ -153,6 +160,10 @@ namespace MessagePack.Formatters
                     result = (global::IMessagePackUnion)formatterResolver.GetFormatterWithVerify<global::PackableARWorldMap>().Deserialize(bytes, offset, formatterResolver, out readSize);
                     offset += readSize;
                     break;
+                case 1:
+                    result = (global::IMessagePackUnion)formatterResolver.GetFormatterWithVerify<global::PackableARCollaborationData>().Deserialize(bytes, offset, formatterResolver, out readSize);
+                    offset += readSize;
+                    break;
                 default:
                     offset += MessagePackBinary.ReadNextBlock(bytes, offset);
                     break;
@@ -181,6 +192,55 @@ namespace MessagePack.Formatters
 {
     using System;
     using MessagePack;
+
+
+    public sealed class PackableARCollaborationDataFormatter : global::MessagePack.Formatters.IMessagePackFormatter<global::PackableARCollaborationData>
+    {
+
+        public int Serialize(ref byte[] bytes, int offset, global::PackableARCollaborationData value, global::MessagePack.IFormatterResolver formatterResolver)
+        {
+            
+            var startOffset = offset;
+            offset += global::MessagePack.MessagePackBinary.WriteFixedArrayHeaderUnsafe(ref bytes, offset, 1);
+            offset += formatterResolver.GetFormatterWithVerify<byte[]>().Serialize(ref bytes, offset, value.ARCollaborationData, formatterResolver);
+            return offset - startOffset;
+        }
+
+        public global::PackableARCollaborationData Deserialize(byte[] bytes, int offset, global::MessagePack.IFormatterResolver formatterResolver, out int readSize)
+        {
+            if (global::MessagePack.MessagePackBinary.IsNil(bytes, offset))
+            {
+                throw new InvalidOperationException("typecode is null, struct not supported");
+            }
+
+            var startOffset = offset;
+            var length = global::MessagePack.MessagePackBinary.ReadArrayHeader(bytes, offset, out readSize);
+            offset += readSize;
+
+            var __ARCollaborationData__ = default(byte[]);
+
+            for (int i = 0; i < length; i++)
+            {
+                var key = i;
+
+                switch (key)
+                {
+                    case 0:
+                        __ARCollaborationData__ = formatterResolver.GetFormatterWithVerify<byte[]>().Deserialize(bytes, offset, formatterResolver, out readSize);
+                        break;
+                    default:
+                        readSize = global::MessagePack.MessagePackBinary.ReadNextBlock(bytes, offset);
+                        break;
+                }
+                offset += readSize;
+            }
+
+            readSize = offset - startOffset;
+
+            var ____result = new global::PackableARCollaborationData(__ARCollaborationData__);
+            return ____result;
+        }
+    }
 
 
     public sealed class PackableARWorldMapFormatter : global::MessagePack.Formatters.IMessagePackFormatter<global::PackableARWorldMap>

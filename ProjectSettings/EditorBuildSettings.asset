@@ -5,9 +5,12 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
-  - enabled: 1
+  - enabled: 0
     path: Assets/Examples/ARWorldMap/ARWorldMap.unity
     guid: 99c9720ab356a0642a771bea13969a05
+  - enabled: 1
+    path: Assets/Examples/CollaborativeSessions/CollaborativeSessions.unity
+    guid: d834aa5c952f040e0ae833d0fbf4c911
   m_configObjects:
     com.unity.xr.arkit.PlayerSettings: {fileID: 11400000, guid: 5825dc8d9fe4b4df4b86f507b5e29bba,
       type: 2}
