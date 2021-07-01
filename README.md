@@ -1,3 +1,9 @@
+**[This is no longer maintained]**
+
+A cooler implementation can be found https://github.com/Unity-Technologies/arfoundation-samples#arcollaborationdata
+
+---
+
 # UnityARKitMultipeerConnectivity
 
 Using the MultipeerConnectivity framework to share AR world between nearby devices.
